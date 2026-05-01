@@ -95,3 +95,20 @@ export type AgentSuggestion = {
   email_sent: boolean;
   created_at: string;
 };
+
+export type DietLog = {
+  id: string;
+  log_date: string;
+  created_at: string;
+  weight_kg?: number | null;
+  kcal?: number | null;
+  fat_g?: number | null;
+  sat_fat_g?: number | null;
+  carbs_g?: number | null;
+  sugar_g?: number | null;
+  fibre_g?: number | null;
+  protein_g?: number | null;
+  salt_g?: number | null;
+  kcal_pct?: number | null;
+  protein_pct?: number | null;
+};
