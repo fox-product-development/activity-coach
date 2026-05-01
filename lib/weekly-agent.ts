@@ -13,6 +13,15 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 export async function runWeeklyAgent(): Promise<{
   summary_text: string;
   subject_line: string;
+  stats: {
+    total_sessions: number;
+    total_minutes: number;
+    total_km: number;
+    avg_mood: number;
+    weight_start: number | null;
+    weight_end: number | null;
+    weight_change: number | null;
+  };
 }> {
   const supabase = createServerSupabaseClient();
 
@@ -180,19 +189,32 @@ ${
 ## Your Task
 Write a warm, encouraging weekly summary email. Structure it as follows:
 
-1. A brief opening (1-2 sentences) — positive and energising
+1. A brief opening (1 sentence only) — positive and energising
 2. Activity recap — what was achieved, highlights, rest days
 3. Weight & diet insight — trends, any notable days, protein/calorie observations
 4. Mood & energy reflection — note any correlations with diet or activity
 5. One clear focus for the coming week — specific and actionable
-6. A warm closing line
+6. A warm closing line (1 sentence only)
 
-Keep the tone friendly and coach-like, not clinical. Use plain paragraphs — no bullet points or headers in the email body itself.
+FORMATTING RULES — follow these exactly:
+- Every section must start with a single bold headline sentence summarising that section, followed by the detail. Use **double asterisks** to mark bold sentences e.g. **This is the bold opener.**
+- Keep each section to 3-4 sentences maximum after the bold opener. Be concise and punchy — cut anything that doesn't add value.
+- Total email length should be around 250-300 words maximum. Be ruthless about cutting filler.
+- Use plain paragraphs separated by blank lines — no bullet points or headers.
 
 Respond in this exact JSON format with no markdown:
 {
   "subject_line": "a punchy, personalised subject line for the email",
-  "summary_text": "the full email body as a single string with paragraph breaks using \\n\\n"
+  "stats": {
+    "total_sessions": number,
+    "total_minutes": number,
+    "total_km": number,
+    "avg_mood": number,
+    "weight_start": number or null,
+    "weight_end": number or null,
+    "weight_change": number or null
+  },
+  "summary_text": "the full email body as a single string with paragraph breaks using \\n\\n. Bold sentences marked with **text**."
 }`;
 
   // -------------------------------------------------------------------------
@@ -212,5 +234,6 @@ Respond in this exact JSON format with no markdown:
   return {
     summary_text: parsed.summary_text,
     subject_line: parsed.subject_line,
+    stats: parsed.stats,
   };
 }
