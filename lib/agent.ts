@@ -89,6 +89,13 @@ export async function runAgent(): Promise<{
   suggested_activity: string;
   suggestion_text: string;
   reasoning: string;
+  yesterday_recap: string;
+  stats: {
+    yesterday_sessions: number;
+    yesterday_minutes: number;
+    yesterday_mood: number | null;
+    yesterday_energy: number | null;
+  };
 }> {
   const supabase = createServerSupabaseClient();
   const today = new Date().toISOString().split("T")[0];
@@ -223,11 +230,19 @@ ${KUNG_FU_LIBRARY.map((k) => `- ${k.id}: ${k.name} (energy required: ${k.energy_
 8. If weight is logged, acknowledge it naturally if relevant — don't make it the focus but it adds useful context about the person's health journey.
 
 Respond in this exact JSON format:
+Respond in this exact JSON format with no markdown:
 {
-  "suggested_activity": "one of: running, cycling_indoor, cycling_outdoor, fishing, kung_fu",
+  "suggested_activity": "one of: running, cycling_indoor, cycling_outdoor, fishing, kung_fu, gym, other",
   "kung_fu_element": "the kung_fu library id if applicable, otherwise null",
-  "suggestion_text": "2-3 sentences addressed directly to the user explaining what you suggest and why. Friendly and motivating.",
-  "reasoning": "1-2 sentences of internal reasoning explaining your logic."
+  "suggestion_text": "3-4 sentences addressed directly to the user explaining what you suggest and why. Friendly and motivating. Start with a bold opener sentence marked with **double asterisks**.",
+  "reasoning": "1-2 sentences of internal reasoning explaining your logic.",
+  "yesterday_recap": "1-2 sentences summarising what the user did yesterday — activities and mood. If nothing was logged say so briefly. Start with a bold opener marked with **double asterisks**.",
+  "stats": {
+    "yesterday_sessions": number or 0,
+    "yesterday_minutes": number or 0,
+    "yesterday_mood": number or null,
+    "yesterday_energy": number or null
+  }
 }`;
 
   // -------------------------------------------------------------------------
@@ -269,5 +284,7 @@ Respond in this exact JSON format:
     suggested_activity: parsed.suggested_activity,
     suggestion_text: suggestionText,
     reasoning: parsed.reasoning,
+    yesterday_recap: parsed.yesterday_recap,
+    stats: parsed.stats,
   };
 }
