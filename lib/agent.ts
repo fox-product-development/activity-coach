@@ -128,6 +128,19 @@ export async function runAgent(): Promise<{
     console.error("Weather fetch failed, continuing without it:", err);
   }
 
+  // Yesterday's diet and weight log
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+  const { data: dietLogs } = await supabase
+    .from("diet_logs")
+    .select("*")
+    .eq("log_date", yesterdayStr)
+    .limit(1);
+
+  const dietLog = dietLogs?.[0] || null;
+
   // -------------------------------------------------------------------------
   // STEP 2: Build the prompt
   // -------------------------------------------------------------------------
@@ -138,6 +151,21 @@ export async function runAgent(): Promise<{
 
 ## Today's Date
 ${today} (${new Date().toLocaleDateString("en-GB", { weekday: "long" })})
+
+## Yesterday's Diet & Weight
+${
+  dietLog
+    ? `
+Weight: ${dietLog.weight_kg != null ? `${dietLog.weight_kg}kg` : "not logged"}
+Calories: ${dietLog.kcal != null ? `${dietLog.kcal} kcal (${dietLog.kcal_pct}% of daily guide)` : "not logged"}
+Protein: ${dietLog.protein_g != null ? `${dietLog.protein_g}g (${dietLog.protein_pct}% of guide)` : "not logged"}
+Carbs: ${dietLog.carbs_g != null ? `${dietLog.carbs_g}g` : "not logged"}
+Fat: ${dietLog.fat_g != null ? `${dietLog.fat_g}g` : "not logged"}
+Fibre: ${dietLog.fibre_g != null ? `${dietLog.fibre_g}g` : "not logged"}
+Sugar: ${dietLog.sugar_g != null ? `${dietLog.sugar_g}g` : "not logged"}
+`
+    : "No diet data logged for yesterday."
+}
 
 ## Today's Mood & Energy Check-in
 ${
@@ -191,6 +219,8 @@ ${KUNG_FU_LIBRARY.map((k) => `- ${k.id}: ${k.name} (energy required: ${k.energy_
 4. If suggesting kung_fu, pick the most appropriate element from the library based on energy level and what hasn't been done recently.
 5. Don't repeat a recent suggestion unless it's clearly the best option.
 6. Be encouraging and specific. Mention the weather, their energy, or their recent pattern in your message.
+7. If diet data is available, factor it in. Low protein yesterday = mention it's a good day for a post-workout meal. Low calories = suggest something less intense. High sugar = note it and suggest balancing activity.
+8. If weight is logged, acknowledge it naturally if relevant — don't make it the focus but it adds useful context about the person's health journey.
 
 Respond in this exact JSON format:
 {
