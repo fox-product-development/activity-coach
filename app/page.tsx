@@ -3,6 +3,80 @@
 import { useState, useEffect } from "react";
 import { Activity, ActivityType, MoodLog } from "@/lib/supabase";
 
+// -------------------------------------------------------------------------
+// COLOUR TOKENS
+// Defined once here so everything stays consistent and is easy to change
+// -------------------------------------------------------------------------
+const colours = {
+  pageBg: "#FFFDF0",
+  primary: "#F5C842",
+  primaryLight: "#FEF9C3",
+  primaryDark: "#92660A",
+  border: "#F0D878",
+  text: "#1A1A1A",
+  textMuted: "#888",
+  cardBg: "#FEF9C3",
+  cardBorder: "#F5C842",
+  white: "#FFFFFF",
+};
+
+// -------------------------------------------------------------------------
+// COLLAPSIBLE SECTION
+// -------------------------------------------------------------------------
+function Section({
+  title,
+  emoji,
+  children,
+}: {
+  title: string;
+  emoji: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div
+      style={{
+        marginBottom: 12,
+        borderRadius: 12,
+        overflow: "hidden",
+        border: `1px solid ${colours.border}`,
+      }}
+    >
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          width: "100%",
+          background: open ? colours.primary : colours.primaryLight,
+          border: "none",
+          padding: "16px 20px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          cursor: "pointer",
+          fontSize: 16,
+          fontWeight: 700,
+          color: colours.primaryDark,
+          transition: "background 0.2s",
+        }}
+      >
+        <span>
+          {emoji} {title}
+        </span>
+        <span style={{ fontSize: 12 }}>{open ? "▲ Hide" : "▼ Show"}</span>
+      </button>
+      {open && (
+        <div style={{ padding: "20px", background: colours.white }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------
+// MAIN PAGE
+// -------------------------------------------------------------------------
 export default function Home() {
   // ACTIVITY FORM STATE
   const [type, setType] = useState<ActivityType>("running");
@@ -129,26 +203,67 @@ export default function Home() {
     return ["", "🪫", "😴", "⚡", "⚡⚡", "⚡⚡⚡"][score];
   }
 
+  const inputStyle = {
+    width: "100%",
+    padding: 8,
+    border: `1px solid ${colours.border}`,
+    borderRadius: 6,
+    fontSize: 14,
+    background: colours.pageBg,
+    boxSizing: "border-box" as const,
+  };
+
+  const buttonStyle = {
+    padding: "10px 24px",
+    background: colours.primary,
+    color: colours.primaryDark,
+    border: "none",
+    borderRadius: 8,
+    fontWeight: 700,
+    fontSize: 14,
+    cursor: "pointer",
+  };
+
   return (
     <main
       style={{
         maxWidth: 600,
-        margin: "40px auto",
-        padding: "0 20px",
+        margin: "0 auto",
+        padding: "40px 20px",
         fontFamily: "sans-serif",
+        background: colours.pageBg,
+        minHeight: "100vh",
+        color: colours.text,
       }}
     >
-      <h1>Activity Coach</h1>
+      {/* HEADER */}
+      <div style={{ marginBottom: 32 }}>
+        <h1 style={{ margin: 0, fontSize: 28, color: colours.primaryDark }}>
+          ☀️ Activity Coach
+        </h1>
+        <p
+          style={{ color: colours.textMuted, margin: "6px 0 0", fontSize: 14 }}
+        >
+          Log your evening mood so your morning suggestion is personalised.
+        </p>
+      </div>
 
-      {/* MOOD CHECK-IN */}
-      <section>
-        <h2>Today's Check-in</h2>
-
+      {/* ------------------------------------------------------------------ */}
+      {/* MOOD SECTION                                                         */}
+      {/* ------------------------------------------------------------------ */}
+      <Section title="Mood" emoji="😊">
         {moodLoading ? (
           <p>Loading...</p>
         ) : todayMood ? (
-          <div style={{ background: "#f5f5f5", padding: 16, borderRadius: 8 }}>
-            <p style={{ margin: 0 }}>
+          <div
+            style={{
+              background: colours.cardBg,
+              border: `1px solid ${colours.cardBorder}`,
+              padding: 16,
+              borderRadius: 8,
+            }}
+          >
+            <p style={{ margin: 0, color: colours.primaryDark }}>
               <strong>Mood:</strong> {scoreLabel(todayMood.mood_score)}{" "}
               {todayMood.mood_score}/5 &nbsp;|&nbsp;
               <strong>Energy:</strong> {energyLabel(todayMood.energy_score)}{" "}
@@ -159,17 +274,27 @@ export default function Home() {
                 {todayMood.notes}
               </p>
             )}
-            <p style={{ margin: "8px 0 0", fontSize: 12, color: "#999" }}>
-              You can update this by submitting again — it will overwrite
-              today's log.
-            </p>
+            <button
+              onClick={() => setTodayMood(null)}
+              style={{
+                background: "none",
+                border: "none",
+                color: colours.primaryDark,
+                fontSize: 12,
+                cursor: "pointer",
+                padding: 0,
+                marginTop: 8,
+                textDecoration: "underline",
+              }}
+            >
+              Update today's log
+            </button>
           </div>
         ) : (
           <form onSubmit={handleMoodSubmit}>
             <div style={{ marginBottom: 16 }}>
-              <label>
-                <strong>Mood</strong> — how are you feeling?{" "}
-                {scoreLabel(moodScore)}
+              <label style={{ fontWeight: 600 }}>
+                Mood — how are you feeling? {scoreLabel(moodScore)}
                 <br />
                 <input
                   type="range"
@@ -177,10 +302,14 @@ export default function Home() {
                   max={5}
                   value={moodScore}
                   onChange={(e) => setMoodScore(Number(e.target.value))}
-                  style={{ width: "100%" }}
+                  style={{ width: "100%", accentColor: colours.primary }}
                 />
                 <small
-                  style={{ display: "flex", justifyContent: "space-between" }}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    color: colours.textMuted,
+                  }}
                 >
                   <span>😔 Bad</span>
                   <span>😄 Great</span>
@@ -189,9 +318,8 @@ export default function Home() {
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <label>
-                <strong>Energy</strong> — physical energy level{" "}
-                {energyLabel(energyScore)}
+              <label style={{ fontWeight: 600 }}>
+                Energy — physical energy level {energyLabel(energyScore)}
                 <br />
                 <input
                   type="range"
@@ -199,10 +327,14 @@ export default function Home() {
                   max={5}
                   value={energyScore}
                   onChange={(e) => setEnergyScore(Number(e.target.value))}
-                  style={{ width: "100%" }}
+                  style={{ width: "100%", accentColor: colours.primary }}
                 />
                 <small
-                  style={{ display: "flex", justifyContent: "space-between" }}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    color: colours.textMuted,
+                  }}
                 >
                   <span>🪫 Exhausted</span>
                   <span>⚡ Energised</span>
@@ -210,47 +342,42 @@ export default function Home() {
               </label>
             </div>
 
-            <div style={{ marginBottom: 12 }}>
-              <label>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontWeight: 600 }}>
                 Notes — optional
                 <br />
                 <textarea
                   value={moodNotes}
                   onChange={(e) => setMoodNotes(e.target.value)}
                   rows={2}
-                  placeholder="e.g. bad night's sleep, feeling motivated..."
-                  style={{ width: "100%", padding: 8 }}
+                  placeholder="e.g. tired after work, feeling good after a walk..."
+                  style={{ ...inputStyle, marginTop: 4 }}
                 />
               </label>
             </div>
 
-            <button
-              type="submit"
-              disabled={moodSubmitting}
-              style={{ padding: "10px 24px" }}
-            >
-              {moodSubmitting ? "Saving..." : "Log Check-in"}
+            <button type="submit" disabled={moodSubmitting} style={buttonStyle}>
+              {moodSubmitting ? "Saving..." : "Log Mood"}
             </button>
 
             {moodMessage && <p style={{ marginTop: 12 }}>{moodMessage}</p>}
           </form>
         )}
-      </section>
+      </Section>
 
-      <hr style={{ margin: "32px 0" }} />
-
-      {/* ACTIVITY LOGGING FORM */}
-      <section>
-        <h2>Log an Activity</h2>
+      {/* ------------------------------------------------------------------ */}
+      {/* ACTIVITIES SECTION                                                   */}
+      {/* ------------------------------------------------------------------ */}
+      <Section title="Activities" emoji="🏃">
         <form onSubmit={handleActivitySubmit}>
           <div style={{ marginBottom: 12 }}>
-            <label>
+            <label style={{ fontWeight: 600 }}>
               Activity
               <br />
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as ActivityType)}
-                style={{ width: "100%", padding: 8 }}
+                style={{ ...inputStyle, marginTop: 4 }}
               >
                 {Object.entries(activityLabels).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -262,20 +389,20 @@ export default function Home() {
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <label>
+            <label style={{ fontWeight: 600 }}>
               Date
               <br />
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                style={{ width: "100%", padding: 8 }}
+                style={{ ...inputStyle, marginTop: 4 }}
               />
             </label>
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <label>
+            <label style={{ fontWeight: 600 }}>
               Duration (minutes)
               <br />
               <input
@@ -284,14 +411,14 @@ export default function Home() {
                 onChange={(e) => setDuration(e.target.value)}
                 min={1}
                 required
-                style={{ width: "100%", padding: 8 }}
+                style={{ ...inputStyle, marginTop: 4 }}
               />
             </label>
           </div>
 
           {(type === "running" || type === "cycling_outdoor") && (
             <div style={{ marginBottom: 12 }}>
-              <label>
+              <label style={{ fontWeight: 600 }}>
                 Distance (km) — optional
                 <br />
                 <input
@@ -300,21 +427,21 @@ export default function Home() {
                   onChange={(e) => setDistance(e.target.value)}
                   step="0.1"
                   min={0}
-                  style={{ width: "100%", padding: 8 }}
+                  style={{ ...inputStyle, marginTop: 4 }}
                 />
               </label>
             </div>
           )}
 
-          <div style={{ marginBottom: 12 }}>
-            <label>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontWeight: 600 }}>
               Notes — optional
               <br />
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
-                style={{ width: "100%", padding: 8 }}
+                style={{ ...inputStyle, marginTop: 4 }}
               />
             </label>
           </div>
@@ -322,7 +449,7 @@ export default function Home() {
           <button
             type="submit"
             disabled={activitySubmitting}
-            style={{ padding: "10px 24px" }}
+            style={buttonStyle}
           >
             {activitySubmitting ? "Saving..." : "Log Activity"}
           </button>
@@ -331,33 +458,49 @@ export default function Home() {
             <p style={{ marginTop: 12 }}>{activityMessage}</p>
           )}
         </form>
-      </section>
 
-      <hr style={{ margin: "32px 0" }} />
+        <hr style={{ margin: "24px 0", borderColor: colours.border }} />
 
-      {/* RECENT ACTIVITIES LIST */}
-      <section>
-        <h2>Recent Activities</h2>
+        <h3 style={{ marginBottom: 12, color: colours.primaryDark }}>
+          Recent Activities
+        </h3>
         {activitiesLoading ? (
           <p>Loading...</p>
         ) : activities.length === 0 ? (
-          <p>No activities logged yet. Add your first one above!</p>
+          <p style={{ color: colours.textMuted }}>No activities logged yet.</p>
         ) : (
-          <ul style={{ listStyle: "none", padding: 0 }}>
+          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {activities.map((activity) => (
               <li
                 key={activity.id}
-                style={{ borderBottom: "1px solid #eee", padding: "12px 0" }}
+                style={{
+                  background: colours.cardBg,
+                  border: `1px solid ${colours.cardBorder}`,
+                  borderLeft: `4px solid ${colours.primary}`,
+                  borderRadius: 8,
+                  padding: "12px 16px",
+                  marginBottom: 8,
+                }}
               >
-                <strong>{activityLabels[activity.type]}</strong> —{" "}
-                {activity.duration_minutes} mins
+                <strong style={{ color: colours.primaryDark }}>
+                  {activityLabels[activity.type]}
+                </strong>
+                <span style={{ color: colours.text }}>
+                  {" "}
+                  — {activity.duration_minutes} mins
+                </span>
                 <br />
-                <small>{formatDate(activity.date)}</small>
+                <small style={{ color: colours.textMuted }}>
+                  {formatDate(activity.date)}
+                </small>
                 {activity.distance_km && (
-                  <span> · {activity.distance_km}km</span>
+                  <span style={{ color: colours.textMuted }}>
+                    {" "}
+                    · {activity.distance_km}km
+                  </span>
                 )}
                 {activity.notes && (
-                  <p style={{ margin: "4px 0 0", color: "#555" }}>
+                  <p style={{ margin: "4px 0 0", color: "#555", fontSize: 13 }}>
                     {activity.notes}
                   </p>
                 )}
@@ -365,7 +508,17 @@ export default function Home() {
             ))}
           </ul>
         )}
-      </section>
+      </Section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* DIET SECTION — placeholder                                           */}
+      {/* ------------------------------------------------------------------ */}
+      <Section title="Diet" emoji="🥗">
+        <p style={{ color: colours.textMuted, fontStyle: "italic", margin: 0 }}>
+          Diet tracking coming soon. This will feed into the agent's suggestions
+          alongside mood and activity data.
+        </p>
+      </Section>
     </main>
   );
 }
