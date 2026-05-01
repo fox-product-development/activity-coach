@@ -64,7 +64,9 @@ export type ActivityType =
   | "cycling_indoor"
   | "cycling_outdoor"
   | "fishing"
-  | "kung_fu";
+  | "kung_fu"
+  | "gym"
+  | "other";
 
 export type Activity = {
   id: string;

@@ -33,7 +33,6 @@ function Section({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-
   return (
     <div
       style={{
@@ -101,6 +100,8 @@ function Popup({ children }: { children: React.ReactNode }) {
           maxWidth: 420,
           width: "100%",
           boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+          maxHeight: "90vh",
+          overflowY: "auto",
         }}
       >
         {children}
@@ -110,38 +111,59 @@ function Popup({ children }: { children: React.ReactNode }) {
 }
 
 // -------------------------------------------------------------------------
-// MAIN PAGE
+// TYPES
 // -------------------------------------------------------------------------
 type PopupStep = "none" | "weight" | "diet";
+type ActivityPopupMode = "none" | "add" | "edit" | "confirm";
+type ActivityTab = "manual" | "screenshot";
 
+const activityLabels: Record<string, string> = {
+  running: "🏃 Running",
+  cycling_indoor: "🚴 Cycling (Indoor)",
+  cycling_outdoor: "🚴 Cycling (Outdoor)",
+  fishing: "🎣 Fishing",
+  kung_fu: "🥋 Kung Fu",
+  gym: "🏋️ Gym",
+  other: "✏️ Other",
+};
+
+// -------------------------------------------------------------------------
+// MAIN PAGE
+// -------------------------------------------------------------------------
 export default function Home() {
-  // POPUP STATE
+  // DIET/WEIGHT POPUP STATE
   const [popupStep, setPopupStep] = useState<PopupStep>("none");
   const [dietLog, setDietLog] = useState<DietLog | null>(null);
   const [yesterdayStr, setYesterdayStr] = useState("");
   const [checkComplete, setCheckComplete] = useState(false);
-
-  // WEIGHT POPUP STATE
   const [weight, setWeight] = useState("");
   const [weightSubmitting, setWeightSubmitting] = useState(false);
   const [weightMessage, setWeightMessage] = useState("");
-
-  // DIET POPUP STATE
   const [dietImage, setDietImage] = useState<File | null>(null);
   const [dietSubmitting, setDietSubmitting] = useState(false);
   const [dietMessage, setDietMessage] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dietFileInputRef = useRef<HTMLInputElement>(null);
 
-  // ACTIVITY FORM STATE
-  const [type, setType] = useState<ActivityType>("running");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [duration, setDuration] = useState("");
-  const [notes, setNotes] = useState("");
-  const [distance, setDistance] = useState("");
+  // ACTIVITY STATE
+  const [days, setDays] = useState<Record<string, Activity[]>>({});
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
+  const [activityPopupMode, setActivityPopupMode] =
+    useState<ActivityPopupMode>("none");
+  const [activityTab, setActivityTab] = useState<ActivityTab>("manual");
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [activityType, setActivityType] = useState<string>("running");
+  const [activityDate, setActivityDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [activityDuration, setActivityDuration] = useState("");
+  const [activityNotes, setActivityNotes] = useState("");
+  const [activityDistance, setActivityDistance] = useState("");
   const [activitySubmitting, setActivitySubmitting] = useState(false);
   const [activityMessage, setActivityMessage] = useState("");
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [activitiesLoading, setActivitiesLoading] = useState(true);
+  const [activityImage, setActivityImage] = useState<File | null>(null);
+  const [activityImageSubmitting, setActivityImageSubmitting] = useState(false);
+  const [activityImageMessage, setActivityImageMessage] = useState("");
+  const activityFileInputRef = useRef<HTMLInputElement>(null);
 
   // MOOD STATE
   const [moodScore, setMoodScore] = useState(3);
@@ -153,7 +175,7 @@ export default function Home() {
   const [moodLoading, setMoodLoading] = useState(true);
 
   // -------------------------------------------------------------------------
-  // ON APP OPEN — check diet status and decide popup flow
+  // LOAD DATA
   // -------------------------------------------------------------------------
   useEffect(() => {
     fetchActivities();
@@ -161,27 +183,11 @@ export default function Home() {
     checkDietStatus();
   }, []);
 
-  async function checkDietStatus() {
-    const res = await fetch("/api/diet");
-    const data = await res.json();
-    setDietLog(data.log);
-    setYesterdayStr(data.yesterdayStr);
-
-    // Decide which popup to show first
-    if (!data.hasWeight) {
-      setPopupStep("weight");
-    } else if (!data.hasDiet) {
-      setPopupStep("diet");
-    } else {
-      setPopupStep("none");
-    }
-    setCheckComplete(true);
-  }
-
   async function fetchActivities() {
+    setActivitiesLoading(true);
     const res = await fetch("/api/activities");
     const data = await res.json();
-    setActivities(data.activities || []);
+    setDays(data.days || {});
     setActivitiesLoading(false);
   }
 
@@ -190,6 +196,128 @@ export default function Home() {
     const data = await res.json();
     setTodayMood(data.todayLog);
     setMoodLoading(false);
+  }
+
+  async function checkDietStatus() {
+    const res = await fetch("/api/diet");
+    const data = await res.json();
+    setDietLog(data.log);
+    setYesterdayStr(data.yesterdayStr);
+    if (!data.hasWeight) setPopupStep("weight");
+    else if (!data.hasDiet) setPopupStep("diet");
+    else setPopupStep("none");
+    setCheckComplete(true);
+  }
+
+  // -------------------------------------------------------------------------
+  // ACTIVITY POPUP HELPERS
+  // -------------------------------------------------------------------------
+  function openAddActivity() {
+    setEditingActivity(null);
+    setActivityType("running");
+    setActivityDate(new Date().toISOString().split("T")[0]);
+    setActivityDuration("");
+    setActivityNotes("");
+    setActivityDistance("");
+    setActivityMessage("");
+    setActivityImage(null);
+    setActivityImageMessage("");
+    setActivityTab("manual");
+    setActivityPopupMode("add");
+  }
+
+  function openEditActivity(activity: Activity) {
+    setEditingActivity(activity);
+    setActivityType(activity.type);
+    setActivityDate(activity.date.split("T")[0]);
+    setActivityDuration(String(activity.duration_minutes));
+    setActivityNotes(activity.notes || "");
+    setActivityDistance(
+      activity.distance_km ? String(activity.distance_km) : "",
+    );
+    setActivityMessage("");
+    setActivityTab("manual");
+    setActivityPopupMode("edit");
+  }
+
+  function closeActivityPopup() {
+    setActivityPopupMode("none");
+    setEditingActivity(null);
+    setActivityImage(null);
+    setActivityMessage("");
+    setActivityImageMessage("");
+  }
+
+  // -------------------------------------------------------------------------
+  // ACTIVITY SUBMIT — MANUAL
+  // -------------------------------------------------------------------------
+  async function handleActivityManualSubmit() {
+    if (!activityType || !activityDate || !activityDuration) return;
+    setActivitySubmitting(true);
+    setActivityMessage("");
+
+    // Use editingActivity being set as the indicator, not the popup mode
+    // because by confirm step the mode is 'confirm' not 'edit'
+    const isEdit = editingActivity != null;
+
+    const res = await fetch(
+      isEdit ? `/api/activities/${editingActivity!.id}` : "/api/activities",
+      {
+        method: isEdit ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: activityType,
+          date: activityDate,
+          duration_minutes: activityDuration,
+          notes: activityNotes || null,
+          distance_km: activityDistance || null,
+        }),
+      },
+    );
+
+    const data = await res.json();
+
+    if (res.ok) {
+      await fetchActivities();
+      closeActivityPopup();
+    } else {
+      setActivityMessage(data.error || "Something went wrong");
+    }
+    setActivitySubmitting(false);
+  }
+  // -------------------------------------------------------------------------
+  // ACTIVITY SUBMIT — SCREENSHOT
+  // -------------------------------------------------------------------------
+  async function handleActivityImageSubmit() {
+    if (!activityImage) return;
+    setActivityImageSubmitting(true);
+    setActivityImageMessage("");
+
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(activityImage);
+    });
+
+    const res = await fetch("/api/activities", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageBase64: base64,
+        mediaType: activityImage.type,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      await fetchActivities();
+      closeActivityPopup();
+    } else {
+      setActivityImageMessage(data.error || "Something went wrong");
+    }
+    setActivityImageSubmitting(false);
   }
 
   // -------------------------------------------------------------------------
@@ -210,7 +338,6 @@ export default function Home() {
 
     if (res.ok) {
       setDietLog(data.log);
-      // Move to diet popup next
       setPopupStep("diet");
       setWeight("");
     } else {
@@ -227,13 +354,9 @@ export default function Home() {
     setDietSubmitting(true);
     setDietMessage("");
 
-    // Convert image to base64
     const base64 = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        resolve(result.split(",")[1]); // Strip the data:image/png;base64, prefix
-      };
+      reader.onload = () => resolve((reader.result as string).split(",")[1]);
       reader.onerror = reject;
       reader.readAsDataURL(dietImage);
     });
@@ -241,10 +364,7 @@ export default function Home() {
     const res = await fetch("/api/diet", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        imageBase64: base64,
-        mediaType: dietImage.type,
-      }),
+      body: JSON.stringify({ imageBase64: base64, mediaType: dietImage.type }),
     });
 
     const data = await res.json();
@@ -257,40 +377,6 @@ export default function Home() {
       setDietMessage(data.error || "Something went wrong");
     }
     setDietSubmitting(false);
-  }
-
-  // -------------------------------------------------------------------------
-  // ACTIVITY SUBMIT
-  // -------------------------------------------------------------------------
-  async function handleActivitySubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setActivitySubmitting(true);
-    setActivityMessage("");
-
-    const res = await fetch("/api/activities", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type,
-        date,
-        duration_minutes: duration,
-        notes: notes || null,
-        distance_km: distance || null,
-      }),
-    });
-
-    const data = await res.json();
-
-    if (res.ok) {
-      setActivityMessage("✅ Activity logged!");
-      setDuration("");
-      setNotes("");
-      setDistance("");
-      fetchActivities();
-    } else {
-      setActivityMessage(`❌ Error: ${data.error}`);
-    }
-    setActivitySubmitting(false);
   }
 
   // -------------------------------------------------------------------------
@@ -326,15 +412,15 @@ export default function Home() {
   // -------------------------------------------------------------------------
   // HELPERS
   // -------------------------------------------------------------------------
-  const activityLabels: Record<ActivityType, string> = {
-    running: "🏃 Running",
-    cycling_indoor: "🚴 Cycling (Indoor)",
-    cycling_outdoor: "🚴 Cycling (Outdoor)",
-    fishing: "🎣 Fishing",
-    kung_fu: "🥋 Kung Fu",
-  };
-
   function formatDate(dateStr: string) {
+    return new Date(dateStr).toLocaleDateString("en-GB", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+  }
+
+  function formatDateShort(dateStr: string) {
     return new Date(dateStr).toLocaleDateString("en-GB", {
       weekday: "short",
       day: "numeric",
@@ -386,9 +472,7 @@ export default function Home() {
   // -------------------------------------------------------------------------
   return (
     <>
-      {/* ------------------------------------------------------------------ */}
-      {/* WEIGHT POPUP                                                         */}
-      {/* ------------------------------------------------------------------ */}
+      {/* WEIGHT POPUP */}
       {checkComplete && popupStep === "weight" && (
         <Popup>
           <h2 style={{ margin: "0 0 8px", color: colours.primaryDark }}>
@@ -403,7 +487,6 @@ export default function Home() {
           >
             Log your weight for {formatDate(yesterdayStr)}.
           </p>
-
           <input
             type="number"
             step="0.1"
@@ -414,7 +497,6 @@ export default function Home() {
             onChange={(e) => setWeight(e.target.value)}
             style={{ ...inputStyle, marginBottom: 16, fontSize: 18 }}
           />
-
           {weightMessage && (
             <p
               style={{ color: colours.error, fontSize: 13, margin: "0 0 12px" }}
@@ -422,7 +504,6 @@ export default function Home() {
               {weightMessage}
             </p>
           )}
-
           <div style={{ display: "flex", alignItems: "center" }}>
             <button
               onClick={handleWeightSubmit}
@@ -438,9 +519,7 @@ export default function Home() {
         </Popup>
       )}
 
-      {/* ------------------------------------------------------------------ */}
-      {/* DIET POPUP                                                           */}
-      {/* ------------------------------------------------------------------ */}
+      {/* DIET POPUP */}
       {checkComplete && popupStep === "diet" && (
         <Popup>
           <h2 style={{ margin: "0 0 8px", color: colours.primaryDark }}>
@@ -456,9 +535,8 @@ export default function Home() {
             Upload your Nutra Check summary screenshot for{" "}
             {formatDate(yesterdayStr)}.
           </p>
-
           <div
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => dietFileInputRef.current?.click()}
             style={{
               border: `2px dashed ${colours.border}`,
               borderRadius: 10,
@@ -485,18 +563,16 @@ export default function Home() {
               </p>
             )}
           </div>
-
           <input
-            ref={fileInputRef}
+            ref={dietFileInputRef}
             type="file"
             accept="image/*"
             style={{ display: "none" }}
             onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) setDietImage(file);
+              const f = e.target.files?.[0];
+              if (f) setDietImage(f);
             }}
           />
-
           {dietMessage && (
             <p
               style={{ color: colours.error, fontSize: 13, margin: "0 0 12px" }}
@@ -504,7 +580,6 @@ export default function Home() {
               {dietMessage}
             </p>
           )}
-
           <div style={{ display: "flex", alignItems: "center" }}>
             <button
               onClick={handleDietSubmit}
@@ -520,9 +595,346 @@ export default function Home() {
         </Popup>
       )}
 
-      {/* ------------------------------------------------------------------ */}
-      {/* MAIN PAGE                                                            */}
-      {/* ------------------------------------------------------------------ */}
+      {/* ACTIVITY ADD/EDIT POPUP */}
+      {(activityPopupMode === "add" || activityPopupMode === "edit") && (
+        <Popup>
+          <h2 style={{ margin: "0 0 4px", color: colours.primaryDark }}>
+            {activityPopupMode === "edit"
+              ? "✏️ Edit Activity"
+              : "➕ Add Activity"}
+          </h2>
+          <p
+            style={{
+              color: colours.textMuted,
+              fontSize: 14,
+              margin: "0 0 20px",
+            }}
+          >
+            {activityPopupMode === "edit"
+              ? "Update the details below."
+              : "Log manually or upload a screenshot."}
+          </p>
+
+          {/* Tabs — only show on add mode */}
+          {activityPopupMode === "add" && (
+            <div
+              style={{
+                display: "flex",
+                marginBottom: 20,
+                borderBottom: `2px solid ${colours.border}`,
+              }}
+            >
+              {(["manual", "screenshot"] as ActivityTab[]).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActivityTab(tab)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: "8px 16px",
+                    fontWeight: activityTab === tab ? 700 : 400,
+                    color:
+                      activityTab === tab
+                        ? colours.primaryDark
+                        : colours.textMuted,
+                    borderBottom:
+                      activityTab === tab
+                        ? `2px solid ${colours.primaryDark}`
+                        : "2px solid transparent",
+                    cursor: "pointer",
+                    fontSize: 14,
+                    marginBottom: -2,
+                  }}
+                >
+                  {tab === "manual" ? "✍️ Manual" : "📸 Screenshot"}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* MANUAL FORM */}
+          {(activityTab === "manual" || activityPopupMode === "edit") && (
+            <div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontWeight: 600 }}>
+                  Activity
+                  <br />
+                  <select
+                    value={activityType}
+                    onChange={(e) => setActivityType(e.target.value)}
+                    style={{ ...inputStyle, marginTop: 4 }}
+                  >
+                    {Object.entries(activityLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontWeight: 600 }}>
+                  Date
+                  <br />
+                  <input
+                    type="date"
+                    value={activityDate}
+                    onChange={(e) => setActivityDate(e.target.value)}
+                    style={{ ...inputStyle, marginTop: 4 }}
+                  />
+                </label>
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontWeight: 600 }}>
+                  Duration (minutes)
+                  <br />
+                  <input
+                    type="number"
+                    value={activityDuration}
+                    onChange={(e) => setActivityDuration(e.target.value)}
+                    min={1}
+                    style={{ ...inputStyle, marginTop: 4 }}
+                  />
+                </label>
+              </div>
+
+              {(activityType === "running" ||
+                activityType === "cycling_outdoor") && (
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontWeight: 600 }}>
+                    Distance (km) — optional
+                    <br />
+                    <input
+                      type="number"
+                      value={activityDistance}
+                      onChange={(e) => setActivityDistance(e.target.value)}
+                      step="0.1"
+                      min={0}
+                      style={{ ...inputStyle, marginTop: 4 }}
+                    />
+                  </label>
+                </div>
+              )}
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontWeight: 600 }}>
+                  Notes — optional
+                  <br />
+                  <textarea
+                    value={activityNotes}
+                    onChange={(e) => setActivityNotes(e.target.value)}
+                    rows={2}
+                    style={{ ...inputStyle, marginTop: 4 }}
+                    placeholder={
+                      activityType === "other"
+                        ? "Describe the activity e.g. Yoga, Pilates..."
+                        : ""
+                    }
+                  />
+                </label>
+              </div>
+
+              {activityMessage && (
+                <p
+                  style={{
+                    color: colours.error,
+                    fontSize: 13,
+                    margin: "0 0 12px",
+                  }}
+                >
+                  {activityMessage}
+                </p>
+              )}
+
+              <div style={{ display: "flex", gap: 10 }}>
+                {activityPopupMode === "edit" ? (
+                  <button
+                    onClick={() => setActivityPopupMode("confirm")}
+                    disabled={!activityDuration}
+                    style={{
+                      ...buttonStyle,
+                      opacity: !activityDuration ? 0.5 : 1,
+                    }}
+                  >
+                    Review Changes
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleActivityManualSubmit}
+                    disabled={activitySubmitting || !activityDuration}
+                    style={{
+                      ...buttonStyle,
+                      opacity: !activityDuration ? 0.5 : 1,
+                    }}
+                  >
+                    {activitySubmitting ? "Saving..." : "Add Activity"}
+                  </button>
+                )}
+                <button onClick={closeActivityPopup} style={skipStyle}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* SCREENSHOT TAB */}
+          {activityTab === "screenshot" && activityPopupMode === "add" && (
+            <div>
+              <p
+                style={{
+                  color: colours.textMuted,
+                  fontSize: 13,
+                  margin: "0 0 16px",
+                }}
+              >
+                Upload a Garmin or Strava activity screenshot — we'll extract
+                the details automatically.
+              </p>
+              <div
+                onClick={() => activityFileInputRef.current?.click()}
+                style={{
+                  border: `2px dashed ${colours.border}`,
+                  borderRadius: 10,
+                  padding: "24px",
+                  textAlign: "center",
+                  cursor: "pointer",
+                  background: colours.primaryLight,
+                  marginBottom: 16,
+                }}
+              >
+                {activityImage ? (
+                  <p
+                    style={{
+                      margin: 0,
+                      color: colours.primaryDark,
+                      fontWeight: 600,
+                    }}
+                  >
+                    ✅ {activityImage.name}
+                  </p>
+                ) : (
+                  <p style={{ margin: 0, color: colours.textMuted }}>
+                    Tap to select Garmin or Strava screenshot
+                  </p>
+                )}
+              </div>
+              <input
+                ref={activityFileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setActivityImage(f);
+                }}
+              />
+
+              {activityImageMessage && (
+                <p
+                  style={{
+                    color: colours.error,
+                    fontSize: 13,
+                    margin: "0 0 12px",
+                  }}
+                >
+                  {activityImageMessage}
+                </p>
+              )}
+
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <button
+                  onClick={handleActivityImageSubmit}
+                  disabled={activityImageSubmitting || !activityImage}
+                  style={{ ...buttonStyle, opacity: !activityImage ? 0.5 : 1 }}
+                >
+                  {activityImageSubmitting
+                    ? "Reading image..."
+                    : "Upload & Extract"}
+                </button>
+                <button onClick={closeActivityPopup} style={skipStyle}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </Popup>
+      )}
+
+      {/* CONFIRM AMENDMENT POPUP */}
+      {activityPopupMode === "confirm" && editingActivity && (
+        <Popup>
+          <h2 style={{ margin: "0 0 8px", color: colours.primaryDark }}>
+            ⚠️ Confirm Changes
+          </h2>
+          <p
+            style={{
+              color: colours.textMuted,
+              fontSize: 14,
+              margin: "0 0 20px",
+            }}
+          >
+            Are you sure you want to update this activity?
+          </p>
+
+          <div
+            style={{
+              background: colours.cardBg,
+              border: `1px solid ${colours.cardBorder}`,
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 20,
+            }}
+          >
+            <p style={{ margin: "0 0 4px" }}>
+              <strong>Type:</strong> {activityLabels[activityType]}
+            </p>
+            <p style={{ margin: "0 0 4px" }}>
+              <strong>Date:</strong> {formatDateShort(activityDate)}
+            </p>
+            <p style={{ margin: "0 0 4px" }}>
+              <strong>Duration:</strong> {activityDuration} mins
+            </p>
+            {activityDistance && (
+              <p style={{ margin: "0 0 4px" }}>
+                <strong>Distance:</strong> {activityDistance}km
+              </p>
+            )}
+            {activityNotes && (
+              <p style={{ margin: 0 }}>
+                <strong>Notes:</strong> {activityNotes}
+              </p>
+            )}
+          </div>
+
+          {activityMessage && (
+            <p
+              style={{ color: colours.error, fontSize: 13, margin: "0 0 12px" }}
+            >
+              {activityMessage}
+            </p>
+          )}
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={handleActivityManualSubmit}
+              disabled={activitySubmitting}
+              style={buttonStyle}
+            >
+              {activitySubmitting ? "Saving..." : "Yes, update"}
+            </button>
+            <button
+              onClick={() => setActivityPopupMode("edit")}
+              style={skipStyle}
+            >
+              Go back
+            </button>
+          </div>
+        </Popup>
+      )}
+
+      {/* MAIN PAGE */}
       <main
         style={{
           maxWidth: 600,
@@ -615,7 +1027,6 @@ export default function Home() {
                   </small>
                 </label>
               </div>
-
               <div style={{ marginBottom: 16 }}>
                 <label style={{ fontWeight: 600 }}>
                   Energy — physical energy level {energyLabel(energyScore)}
@@ -640,7 +1051,6 @@ export default function Home() {
                   </small>
                 </label>
               </div>
-
               <div style={{ marginBottom: 16 }}>
                 <label style={{ fontWeight: 600 }}>
                   Notes — optional
@@ -654,7 +1064,6 @@ export default function Home() {
                   />
                 </label>
               </div>
-
               <button
                 type="submit"
                 disabled={moodSubmitting}
@@ -662,7 +1071,6 @@ export default function Home() {
               >
                 {moodSubmitting ? "Saving..." : "Log Mood"}
               </button>
-
               {moodMessage && <p style={{ marginTop: 12 }}>{moodMessage}</p>}
             </form>
           )}
@@ -670,145 +1078,93 @@ export default function Home() {
 
         {/* ACTIVITIES SECTION */}
         <Section title="Activities" emoji="🏃">
-          <form onSubmit={handleActivitySubmit}>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontWeight: 600 }}>
-                Activity
-                <br />
-                <select
-                  value={type}
-                  onChange={(e) => setType(e.target.value as ActivityType)}
-                  style={{ ...inputStyle, marginTop: 4 }}
-                >
-                  {Object.entries(activityLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontWeight: 600 }}>
-                Date
-                <br />
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  style={{ ...inputStyle, marginTop: 4 }}
-                />
-              </label>
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontWeight: 600 }}>
-                Duration (minutes)
-                <br />
-                <input
-                  type="number"
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  min={1}
-                  required
-                  style={{ ...inputStyle, marginTop: 4 }}
-                />
-              </label>
-            </div>
-
-            {(type === "running" || type === "cycling_outdoor") && (
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ fontWeight: 600 }}>
-                  Distance (km) — optional
-                  <br />
-                  <input
-                    type="number"
-                    value={distance}
-                    onChange={(e) => setDistance(e.target.value)}
-                    step="0.1"
-                    min={0}
-                    style={{ ...inputStyle, marginTop: 4 }}
-                  />
-                </label>
-              </div>
-            )}
-
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ fontWeight: 600 }}>
-                Notes — optional
-                <br />
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  style={{ ...inputStyle, marginTop: 4 }}
-                />
-              </label>
-            </div>
-
-            <button
-              type="submit"
-              disabled={activitySubmitting}
-              style={buttonStyle}
-            >
-              {activitySubmitting ? "Saving..." : "Log Activity"}
-            </button>
-
-            {activityMessage && (
-              <p style={{ marginTop: 12 }}>{activityMessage}</p>
-            )}
-          </form>
-
-          <hr style={{ margin: "24px 0", borderColor: colours.border }} />
-
-          <h3 style={{ marginBottom: 12, color: colours.primaryDark }}>
-            Recent Activities
-          </h3>
           {activitiesLoading ? (
             <p>Loading...</p>
-          ) : activities.length === 0 ? (
-            <p style={{ color: colours.textMuted }}>
-              No activities logged yet.
-            </p>
           ) : (
-            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              {activities.map((activity) => (
-                <li
-                  key={activity.id}
-                  style={{
-                    background: colours.cardBg,
-                    border: `1px solid ${colours.cardBorder}`,
-                    borderLeft: `4px solid ${colours.primary}`,
-                    borderRadius: 8,
-                    padding: "12px 16px",
-                    marginBottom: 8,
-                  }}
-                >
-                  <strong style={{ color: colours.primaryDark }}>
-                    {activityLabels[activity.type]}
-                  </strong>
-                  <span> — {activity.duration_minutes} mins</span>
-                  <br />
-                  <small style={{ color: colours.textMuted }}>
-                    {formatDate(activity.date)}
-                  </small>
-                  {activity.distance_km && (
-                    <span style={{ color: colours.textMuted }}>
-                      {" "}
-                      · {activity.distance_km}km
-                    </span>
-                  )}
-                  {activity.notes && (
+            <>
+              {/* 7 DAY VIEW */}
+              {Object.entries(days).map(([dateKey, dayActivities]) => (
+                <div key={dateKey} style={{ marginBottom: 16 }}>
+                  <p
+                    style={{
+                      margin: "0 0 8px",
+                      fontWeight: 700,
+                      color: colours.primaryDark,
+                      fontSize: 14,
+                    }}
+                  >
+                    {formatDate(dateKey)}
+                  </p>
+                  {dayActivities.length === 0 ? (
                     <p
-                      style={{ margin: "4px 0 0", color: "#555", fontSize: 13 }}
+                      style={{
+                        color: colours.textMuted,
+                        fontSize: 13,
+                        fontStyle: "italic",
+                        margin: "0 0 0 4px",
+                      }}
                     >
-                      {activity.notes}
+                      Rest day
                     </p>
+                  ) : (
+                    dayActivities.map((activity) => (
+                      <div
+                        key={activity.id}
+                        onClick={() => openEditActivity(activity)}
+                        style={{
+                          background: colours.cardBg,
+                          border: `1px solid ${colours.cardBorder}`,
+                          borderLeft: `4px solid ${colours.primary}`,
+                          borderRadius: 8,
+                          padding: "10px 14px",
+                          marginBottom: 6,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <strong style={{ color: colours.primaryDark }}>
+                          {activityLabels[activity.type] || activity.type}
+                        </strong>
+                        <span> — {activity.duration_minutes} mins</span>
+                        {activity.distance_km && (
+                          <span style={{ color: colours.textMuted }}>
+                            {" "}
+                            · {activity.distance_km}km
+                          </span>
+                        )}
+                        {activity.notes && (
+                          <p
+                            style={{
+                              margin: "4px 0 0",
+                              fontSize: 13,
+                              color: "#555",
+                            }}
+                          >
+                            {activity.notes}
+                          </p>
+                        )}
+                        <p
+                          style={{
+                            margin: "4px 0 0",
+                            fontSize: 11,
+                            color: colours.textMuted,
+                          }}
+                        >
+                          Tap to edit
+                        </p>
+                      </div>
+                    ))
                   )}
-                </li>
+                </div>
               ))}
-            </ul>
+
+              {/* ADD BUTTON */}
+              <button
+                onClick={openAddActivity}
+                style={{ ...buttonStyle, width: "100%", marginTop: 8 }}
+              >
+                ➕ Add Activity
+              </button>
+            </>
           )}
         </Section>
 
@@ -816,7 +1172,6 @@ export default function Home() {
         <Section title="Diet" emoji="🥗">
           {dietLog ? (
             <div>
-              {/* Summary */}
               <div
                 style={{
                   background: colours.cardBg,
@@ -835,13 +1190,11 @@ export default function Home() {
                 >
                   {formatDate(dietLog.log_date)}
                 </p>
-
                 {dietLog.weight_kg && (
                   <p style={{ margin: "0 0 8px", fontSize: 14 }}>
                     ⚖️ <strong>Weight:</strong> {dietLog.weight_kg}kg
                   </p>
                 )}
-
                 {dietLog.kcal ? (
                   <div style={{ fontSize: 14 }}>
                     <p style={{ margin: "0 0 4px" }}>
@@ -878,8 +1231,6 @@ export default function Home() {
                   </p>
                 )}
               </div>
-
-              {/* Update buttons */}
               <div style={{ display: "flex", gap: 10 }}>
                 <button
                   onClick={() => setPopupStep("weight")}
