@@ -1,25 +1,40 @@
 // app/api/email/route.ts
 //
-// This endpoint runs the agent AND sends the email in one go.
-// The cron job will call this every morning.
-// We can also trigger it manually by visiting the URL for testing.
+// UPDATED: Added cron secret verification
+// Vercel automatically sends an Authorization header when it triggers a cron job.
+// We check that header matches our CRON_SECRET before doing anything.
+// If the secret doesn't match, we return a 401 (Unauthorized) and stop.
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { runAgent } from "@/lib/agent";
 import { sendSuggestionEmail } from "@/lib/email";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // -------------------------------------------------------------------------
+  // SECURITY CHECK
+  // -------------------------------------------------------------------------
+  const authHeader = request.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+
+  // Allow the request if:
+  // 1. The authorization header matches our secret (Vercel cron job)
+  // 2. We're in local development (no secret set yet)
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    console.warn("Unauthorized cron attempt blocked");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // -------------------------------------------------------------------------
+  // AGENT + EMAIL
+  // -------------------------------------------------------------------------
   try {
-    // Step 1: Run the agent to get today's suggestion
     console.log("Running agent...");
     const result = await runAgent();
 
-    // Step 2: Send the email
     console.log("Sending email...");
     await sendSuggestionEmail(result);
 
-    // Step 3: Mark the suggestion as emailed in Supabase
     const supabase = createServerSupabaseClient();
     const today = new Date().toISOString().split("T")[0];
 
