@@ -201,11 +201,17 @@ export default function Home() {
   async function checkDietStatus() {
     const res = await fetch("/api/diet");
     const data = await res.json();
-    setDietLog(data.log);
+    setDietLog(data.todayLog);
     setYesterdayStr(data.yesterdayStr);
-    if (!data.hasWeight) setPopupStep("weight");
-    else if (!data.hasDiet) setPopupStep("diet");
-    else setPopupStep("none");
+
+    // Weight check is for TODAY, diet check is for YESTERDAY
+    if (!data.hasWeight) {
+      setPopupStep("weight");
+    } else if (!data.hasDiet) {
+      setPopupStep("diet");
+    } else {
+      setPopupStep("none");
+    }
     setCheckComplete(true);
   }
 
@@ -331,7 +337,7 @@ export default function Home() {
     const res = await fetch("/api/diet", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ weight_kg: weight, log_date: yesterdayStr }),
+      body: JSON.stringify({ weight_kg: weight }),
     });
 
     const data = await res.json();
@@ -476,7 +482,7 @@ export default function Home() {
       {checkComplete && popupStep === "weight" && (
         <Popup>
           <h2 style={{ margin: "0 0 8px", color: colours.primaryDark }}>
-            ⚖️ Today's Weight
+            ⚖️ Morning Weigh-in
           </h2>
           <p
             style={{
@@ -485,7 +491,7 @@ export default function Home() {
               margin: "0 0 20px",
             }}
           >
-            Log your weight for {formatDate(yesterdayStr)}.
+            Log your weight for today — best done first thing for consistency.
           </p>
           <input
             type="number"
