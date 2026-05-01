@@ -11,6 +11,7 @@ const colours = {
   primary: "#F5C842",
   primaryLight: "#FEF9C3",
   primaryDark: "#92660A",
+  primaryMotivation: "#F7F70C",
   border: "#F0D878",
   text: "#1A1A1A",
   textMuted: "#888",
@@ -131,6 +132,15 @@ const activityLabels: Record<string, string> = {
 // MAIN PAGE
 // -------------------------------------------------------------------------
 export default function Home() {
+  // GOAL STATE
+  const [goal, setGoal] = useState("");
+  const [goalEditing, setGoalEditing] = useState(false);
+  const [goalInput, setGoalInput] = useState("");
+  const [goalSaving, setGoalSaving] = useState(false);
+
+  // DAILY MOTIVATION STATE
+  const [motivation, setMotivation] = useState("");
+
   // DIET/WEIGHT POPUP STATE
   const [popupStep, setPopupStep] = useState<PopupStep>("none");
   const [dietLog, setDietLog] = useState<DietLog | null>(null);
@@ -181,6 +191,8 @@ export default function Home() {
     fetchActivities();
     fetchMood();
     checkDietStatus();
+    fetchGoal();
+    fetchMotivation();
   }, []);
 
   async function fetchActivities() {
@@ -196,6 +208,19 @@ export default function Home() {
     const data = await res.json();
     setTodayMood(data.todayLog);
     setMoodLoading(false);
+  }
+
+  async function fetchGoal() {
+    const res = await fetch("/api/settings?key=goal");
+    const data = await res.json();
+    setGoal(data.value || "");
+    setGoalInput(data.value || "");
+  }
+
+  async function fetchMotivation() {
+    const res = await fetch("/api/agent/today");
+    const data = await res.json();
+    setMotivation(data.motivation || "");
   }
 
   async function checkDietStatus() {
@@ -324,6 +349,23 @@ export default function Home() {
       setActivityImageMessage(data.error || "Something went wrong");
     }
     setActivityImageSubmitting(false);
+  }
+
+  async function handleGoalSave() {
+    if (!goalInput.trim()) return;
+    setGoalSaving(true);
+
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "goal", value: goalInput.trim() }),
+    });
+
+    if (res.ok) {
+      setGoal(goalInput.trim());
+      setGoalEditing(false);
+    }
+    setGoalSaving(false);
   }
 
   // -------------------------------------------------------------------------
@@ -943,7 +985,7 @@ export default function Home() {
       {/* MAIN PAGE */}
       <main
         style={{
-          maxWidth: 600,
+          maxWidth: 400,
           margin: "0 auto",
           padding: "40px 20px",
           fontFamily: "sans-serif",
@@ -959,12 +1001,140 @@ export default function Home() {
           <p
             style={{
               color: colours.textMuted,
-              margin: "6px 0 0",
+              margin: "6px 0 0 0",
               fontSize: 14,
             }}
           >
             Log your evening mood so your morning suggestion is personalised.
           </p>
+
+          {/* DAILY MOTIVATION */}
+          {motivation && (
+            <div
+              style={{
+                marginTop: 5,
+                background: colours.primaryMotivation,
+                border: `1px solid ${colours.primary}`,
+                borderRadius: 8,
+                padding: "10px 14px",
+                fontWeight: 400,
+                maxWidth: 380,
+                textAlign: "center",
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  color: colours.primaryDark,
+                  fontSize: 16,
+                  fontStyle: "italic",
+                }}
+              >
+                {motivation}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* GOAL */}
+        <div style={{ marginBottom: 55 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span
+              style={{
+                fontWeight: 700,
+                color: colours.primaryDark,
+                fontSize: 16,
+                textAlign: "center",
+              }}
+            >
+              Goal
+            </span>
+            {goalEditing ? (
+              <div style={{ flex: 1 }}>
+                <textarea
+                  value={goalInput}
+                  onChange={(e) => setGoalInput(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Improve overall fitness and lose weight"
+                  style={{ ...inputStyle, marginBottom: 8 }}
+                />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={handleGoalSave}
+                    disabled={goalSaving}
+                    style={{
+                      ...buttonStyle,
+                      padding: "6px 14px",
+                      fontSize: 16,
+                    }}
+                  >
+                    {goalSaving ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setGoalEditing(false);
+                      setGoalInput(goal);
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: colours.textMuted,
+                      fontSize: 12,
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  background: colours.primaryMotivation,
+                  border: `1px solid ${colours.border}`,
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                  color: colours.primaryDark,
+                  fontSize: 18,
+                  fontWeight: 600,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  maxWidth: 380,
+                }}
+              >
+                <span style={{ flex: 1, textAlign: "center" }}>
+                  {goal || (
+                    <span
+                      style={{
+                        color: colours.textMuted,
+                        fontWeight: 400,
+                        fontStyle: "italic",
+                      }}
+                    >
+                      No goal set
+                    </span>
+                  )}
+                </span>
+                <button
+                  onClick={() => setGoalEditing(true)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: colours.textMuted,
+                    fontSize: 10,
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    padding: 0,
+                  }}
+                >
+                  edit
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* MOOD SECTION */}

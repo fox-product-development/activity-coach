@@ -148,3 +148,24 @@ create table diet_logs (
 
 alter table diet_logs enable row level security;
 create policy "Allow all on diet_logs" on diet_logs for all using (true) with check (true);
+-- =============================================================================
+-- TABLE: settings
+-- Generic key/value store for app settings
+-- Currently used for: goal
+-- Can be extended for future settings without new tables
+-- =============================================================================
+create table settings (
+  id uuid default gen_random_uuid() primary key,
+
+  -- Setting name e.g. 'goal'
+  key text not null unique,
+
+  -- Setting value — free text
+  value text not null,
+
+  -- When this setting was last changed
+  updated_at timestamptz default now()
+);
+
+alter table settings enable row level security;
+create policy "Allow all on settings" on settings for all using (true) with check (true);

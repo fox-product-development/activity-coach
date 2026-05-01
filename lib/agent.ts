@@ -134,6 +134,14 @@ export async function runAgent(): Promise<{
   } catch (err) {
     console.error("Weather fetch failed, continuing without it:", err);
   }
+  // User's current goal
+  const { data: goalData } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("key", "goal")
+    .limit(1);
+
+  const userGoal = goalData?.[0]?.value || null;
 
   // Yesterday's diet and weight log
   const yesterday = new Date();
@@ -155,6 +163,12 @@ export async function runAgent(): Promise<{
   // The more specific and organised the context, the better the suggestion.
 
   const prompt = `You are a personal activity coach. Your job is to suggest ONE activity for today based on the context below.
+
+  ## User's Current Goal
+${userGoal ? userGoal : "No goal set — give general balanced suggestions."}
+
+## User's Current Goal
+${userGoal ? userGoal : "No goal set — give general balanced suggestions."}
 
 ## Today's Date
 ${today} (${new Date().toLocaleDateString("en-GB", { weekday: "long" })})
