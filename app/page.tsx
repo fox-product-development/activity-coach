@@ -571,7 +571,7 @@ export default function Home() {
       {checkComplete && popupStep === "diet" && (
         <Popup>
           <h2 style={{ margin: "0 0 8px", color: colours.primaryDark }}>
-            🥗 Yesterday's Diet
+            🥗 Today's Diet
           </h2>
           <p
             style={{
@@ -581,7 +581,7 @@ export default function Home() {
             }}
           >
             Upload your Nutra Check summary screenshot for{" "}
-            {formatDate(yesterdayStr)}.
+            {formatDate(new Date().toISOString().split("T")[0])}.
           </p>
           <div
             onClick={() => dietFileInputRef.current?.click()}

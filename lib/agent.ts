@@ -18,8 +18,6 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// The Kung Fu content library — 10 practice elements the agent rotates
-// intelligently based on energy level and recency
 const KUNG_FU_LIBRARY = [
   {
     id: "basics",
@@ -100,25 +98,43 @@ export async function runAgent(): Promise<{
   const supabase = createServerSupabaseClient();
   const today = new Date().toISOString().split("T")[0];
 
+  // Yesterday and 7 days ago for date ranges
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const sevenDaysAgoStr = sevenDaysAgo.toISOString().split("T")[0];
+
   // -------------------------------------------------------------------------
   // STEP 1: Gather all context
   // -------------------------------------------------------------------------
 
-  // Recent activities (last 14 days)
-  const { data: activities } = await supabase
+  // Yesterday's activities — primary input
+  const { data: yesterdayActivities } = await supabase
     .from("activities")
     .select("*")
-    .order("date", { ascending: false })
-    .limit(14);
+    .gte("date", yesterdayStr)
+    .lt("date", today)
+    .order("date", { ascending: false });
 
-  // Today's mood log
+  // Last 7 days activities — recovery and pattern context
+  const { data: recentActivities } = await supabase
+    .from("activities")
+    .select("*")
+    .gte("date", sevenDaysAgoStr)
+    .lt("date", yesterdayStr)
+    .order("date", { ascending: false });
+
+  // Yesterday's mood log
   const { data: moodLogs } = await supabase
     .from("mood_logs")
     .select("*")
-    .eq("log_date", today)
+    .eq("log_date", yesterdayStr)
     .limit(1);
 
-  const todayMood = moodLogs?.[0] || null;
+  const yesterdayMood = moodLogs?.[0] || null;
 
   // Recent suggestions (so the agent doesn't repeat itself)
   const { data: recentSuggestions } = await supabase
@@ -134,6 +150,7 @@ export async function runAgent(): Promise<{
   } catch (err) {
     console.error("Weather fetch failed, continuing without it:", err);
   }
+
   // User's current goal
   const { data: goalData } = await supabase
     .from("settings")
@@ -144,10 +161,6 @@ export async function runAgent(): Promise<{
   const userGoal = goalData?.[0]?.value || null;
 
   // Yesterday's diet and weight log
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split("T")[0];
-
   const { data: dietLogs } = await supabase
     .from("diet_logs")
     .select("*")
@@ -159,13 +172,8 @@ export async function runAgent(): Promise<{
   // -------------------------------------------------------------------------
   // STEP 2: Build the prompt
   // -------------------------------------------------------------------------
-  // We give Claude a structured summary of everything it needs to know.
-  // The more specific and organised the context, the better the suggestion.
 
   const prompt = `You are a personal activity coach. Your job is to suggest ONE activity for today based on the context below.
-
-  ## User's Current Goal
-${userGoal ? userGoal : "No goal set — give general balanced suggestions."}
 
 ## User's Current Goal
 ${userGoal ? userGoal : "No goal set — give general balanced suggestions."}
@@ -188,11 +196,11 @@ Sugar: ${dietLog.sugar_g != null ? `${dietLog.sugar_g}g` : "not logged"}
     : "No diet data logged for yesterday."
 }
 
-## Today's Mood & Energy Check-in
+## Yesterday's Mood & Energy
 ${
-  todayMood
-    ? `Mood: ${todayMood.mood_score}/5, Energy: ${todayMood.energy_score}/5${todayMood.notes ? `, Notes: "${todayMood.notes}"` : ""}`
-    : "No check-in logged yet today."
+  yesterdayMood
+    ? `Mood: ${yesterdayMood.mood_score}/5, Energy: ${yesterdayMood.energy_score}/5${yesterdayMood.notes ? `, Notes: "${yesterdayMood.notes}"` : ""}`
+    : "No mood logged yesterday."
 }
 
 ## Current Weather
@@ -202,16 +210,28 @@ ${
     : "Weather data unavailable."
 }
 
-## Recent Activity History (last 14 days)
+## Yesterday's Activities
 ${
-  activities && activities.length > 0
-    ? activities
+  yesterdayActivities && yesterdayActivities.length > 0
+    ? yesterdayActivities
         .map(
           (a) =>
-            `- ${a.date}: ${a.type} for ${a.duration_minutes} mins${a.notes ? ` ("${a.notes}")` : ""}`,
+            `- ${a.type} for ${a.duration_minutes} mins${a.distance_km ? ` (${a.distance_km}km)` : ""}${a.notes ? ` — "${a.notes}"` : ""}`,
         )
         .join("\n")
-    : "No recent activities logged."
+    : "No activities logged yesterday — rest day."
+}
+
+## Last 7 Days Activity Context (for recovery and pattern awareness only — do not reference activities older than 2 days directly)
+${
+  recentActivities && recentActivities.length > 0
+    ? recentActivities
+        .map(
+          (a) =>
+            `- ${a.date.split("T")[0]}: ${a.type} for ${a.duration_minutes} mins${a.notes ? ` — "${a.notes}"` : ""}`,
+        )
+        .join("\n")
+    : "No activities in the last 7 days."
 }
 
 ## Recent Suggestions (avoid repeating these)
@@ -229,21 +249,23 @@ ${
 - cycling_outdoor (check weather)
 - fishing (outdoor — check weather)
 - kung_fu
+- gym
+- other
 
 ## Kung Fu Content Library (if suggesting kung_fu, pick ONE element)
 ${KUNG_FU_LIBRARY.map((k) => `- ${k.id}: ${k.name} (energy required: ${k.energy_required}) — ${k.description}`).join("\n")}
 
 ## Your Instructions
-1. Consider the mood and energy scores. Low energy = suggest gentler activities.
+1. Consider yesterday's mood and energy scores. Low energy = suggest gentler activities.
 2. Consider the weather. Don't suggest outdoor activities if conditions are poor.
-3. Look at the activity history. Encourage variety and avoid suggesting the same thing too many times in a row.
+3. Yesterday's activities are the primary input. Use the last 7 days for recovery and pattern awareness only.
 4. If suggesting kung_fu, pick the most appropriate element from the library based on energy level and what hasn't been done recently.
 5. Don't repeat a recent suggestion unless it's clearly the best option.
 6. Be encouraging and specific. Mention the weather, their energy, or their recent pattern in your message.
 7. If diet data is available, factor it in. Low protein yesterday = mention it's a good day for a post-workout meal. Low calories = suggest something less intense. High sugar = note it and suggest balancing activity.
 8. If weight is logged, acknowledge it naturally if relevant — don't make it the focus but it adds useful context about the person's health journey.
+9. Factor in the user's goal when making suggestions — tailor the activity and messaging to support it.
 
-Respond in this exact JSON format:
 Respond in this exact JSON format with no markdown:
 {
   "suggested_activity": "one of: running, cycling_indoor, cycling_outdoor, fishing, kung_fu, gym, other",
@@ -268,11 +290,9 @@ Respond in this exact JSON format with no markdown:
     messages: [{ role: "user", content: prompt }],
   });
 
-  // Extract the text response
   const responseText =
     message.content[0].type === "text" ? message.content[0].text : "";
 
-  // Parse the JSON — strip any markdown fences Claude might add
   const clean = responseText.replace(/```json|```/g, "").trim();
   const parsed = JSON.parse(clean);
 

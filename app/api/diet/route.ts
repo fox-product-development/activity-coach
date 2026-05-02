@@ -53,7 +53,7 @@ export async function GET() {
     const yesterdayLog = yesterdayData?.[0] || null;
 
     const hasWeight = todayLog?.weight_kg != null;
-    const hasDiet = yesterdayLog?.kcal != null;
+    const hasDiet = todayLog?.kcal != null;
 
     return NextResponse.json({
       todayLog,
