@@ -75,6 +75,13 @@ export type Activity = {
   duration_minutes: number;
   notes?: string;
   distance_km?: number;
+  avg_heart_rate?: number | null;
+  avg_pace?: string | null;
+  avg_speed_kmh?: number | null;
+  elevation_m?: number | null;
+  calories?: number | null;
+  avg_power_w?: number | null;
+  ai_notes?: string | null;
   created_at: string;
 };
 

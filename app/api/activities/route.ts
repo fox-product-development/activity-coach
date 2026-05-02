@@ -77,7 +77,13 @@ export async function POST(request: NextRequest) {
           date: extracted.date,
           duration_minutes: extracted.duration_minutes,
           distance_km: extracted.distance_km,
-          notes: extracted.notes,
+          avg_heart_rate: extracted.avg_heart_rate,
+          avg_pace: extracted.avg_pace,
+          avg_speed_kmh: extracted.avg_speed_kmh,
+          elevation_m: extracted.elevation_m,
+          calories: extracted.calories,
+          avg_power_w: extracted.avg_power_w,
+          notes: extracted.ai_notes,
         })
         .select();
 

@@ -37,6 +37,14 @@ create table activities (
 
   -- When the row was created
   created_at timestamptz default now()
+
+  column avg_heart_rate integer,
+ column avg_pace text,
+ column avg_speed_kmh numeric(5,1),
+ column elevation_m integer,
+ column calories integer,
+ column avg_power_w integer,
+ column ai_notes text;
 );
 
 alter table activities enable row level security;

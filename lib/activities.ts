@@ -1,8 +1,8 @@
 // lib/activities.ts
 //
 // Handles image extraction from Garmin and Strava screenshots.
-// Same pattern as lib/weather.ts and lib/email.ts — logic lives here,
-// API route imports and uses it.
+// Extracts all available metrics including heart rate, pace, speed,
+// elevation, calories, power, and AI summaries from Strava.
 
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -13,7 +13,13 @@ export type ExtractedActivity = {
   date: string;
   duration_minutes: number;
   distance_km?: number | null;
-  notes?: string | null;
+  avg_heart_rate?: number | null;
+  avg_pace?: string | null;
+  avg_speed_kmh?: number | null;
+  elevation_m?: number | null;
+  calories?: number | null;
+  avg_power_w?: number | null;
+  ai_notes?: string | null;
   source: "garmin" | "strava" | "unknown";
 };
 
@@ -21,6 +27,11 @@ export async function extractActivityFromImage(
   imageBase64: string,
   mediaType: string,
 ): Promise<ExtractedActivity> {
+  const today = new Date().toISOString().split("T")[0];
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split("T")[0];
+
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1024,
@@ -43,22 +54,29 @@ export async function extractActivityFromImage(
           {
             type: "text",
             text: `This is a fitness activity screenshot from either Garmin or Strava.
+Today's date is ${today}.
 
 Please extract the following and respond ONLY in JSON format with no markdown:
 {
   "source": "garmin" or "strava" or "unknown",
   "activity_type": "the type of activity e.g. running, cycling, swimming, gym, hiking — use lowercase",
-  "date": "the date in YYYY-MM-DD format",
-  "duration_minutes": number (convert from HH:MM:SS or MM:SS to total minutes, rounded to nearest minute),
-  "distance_km": number or null (convert miles to km if needed, null if not shown),
-  "avg_heart_rate": number or null,
-  "avg_pace_per_km": "string e.g. 5:50 or null",
+  "date": "YYYY-MM-DD format. IMPORTANT date rules:
+    - If the screenshot shows 'Today' or 'Today at HH:MM' → use ${today}
+    - If the screenshot shows 'Yesterday' → use ${yesterdayStr}
+    - If a specific date is shown → convert to YYYY-MM-DD format
+    - Never guess or infer a date from context",
+  "duration_minutes": number (convert HH:MM:SS or MM:SS to total minutes, rounded to nearest minute),
+  "distance_km": number or null (convert miles to km if needed),
+  "avg_heart_rate": number or null (bpm),
+  "avg_pace": "string in MM:SS/km format or null (for running activities)",
+  "avg_speed_kmh": number or null (for cycling activities, convert mph if needed),
+  "elevation_m": number or null (metres, convert feet if needed),
   "calories": number or null,
-  "elevation_m": number or null,
-  "notes": "a brief auto-generated note e.g. '5km run, avg HR 154bpm, pace 5:50/km'"
+  "avg_power_w": number or null (watts, cycling only),
+  "ai_notes": "the AI generated summary text if present (e.g. Strava Athlete Intelligence text), otherwise null"
 }
 
-For activity_type, map to one of these if possible: running, cycling_outdoor, cycling_indoor, fishing, kung_fu, gym. Otherwise use the activity name as-is.`,
+For numeric values extract just the number without units.`,
           },
         ],
       },
@@ -75,9 +93,11 @@ For activity_type, map to one of these if possible: running, cycling_outdoor, cy
     running: "running",
     run: "running",
     cycling: "cycling_outdoor",
+    ride: "cycling_outdoor",
     cycling_outdoor: "cycling_outdoor",
     cycling_indoor: "cycling_indoor",
     indoor_cycling: "cycling_indoor",
+    virtual_ride: "cycling_indoor",
     fishing: "fishing",
     kung_fu: "kung_fu",
     gym: "gym",
@@ -93,7 +113,13 @@ For activity_type, map to one of these if possible: running, cycling_outdoor, cy
     date: extracted.date,
     duration_minutes: Math.round(extracted.duration_minutes),
     distance_km: extracted.distance_km || null,
-    notes: extracted.notes || null,
+    avg_heart_rate: extracted.avg_heart_rate || null,
+    avg_pace: extracted.avg_pace || null,
+    avg_speed_kmh: extracted.avg_speed_kmh || null,
+    elevation_m: extracted.elevation_m || null,
+    calories: extracted.calories || null,
+    avg_power_w: extracted.avg_power_w || null,
+    ai_notes: extracted.ai_notes || null,
     source: extracted.source,
   };
 }
