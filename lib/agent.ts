@@ -242,7 +242,15 @@ ${
         .join("\n")
     : "No recent suggestions."
 }
-
+## Availability Constraints
+${
+  ["Saturday", "Sunday"].includes(
+    new Date().toLocaleDateString("en-GB", { weekday: "long" }),
+  )
+    ? "Today is a weekend — do NOT suggest gym as it is an office gym and not accessible."
+    : "Gym is available today."
+}
+  
 ## Available Activities
 - running (outdoor — check weather)
 - cycling_indoor
