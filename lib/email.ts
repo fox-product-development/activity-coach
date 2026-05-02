@@ -13,6 +13,8 @@ export async function sendSuggestionEmail(suggestion: {
   suggested_activity: string;
   suggestion_text: string;
   reasoning: string;
+  kung_fu_element: string;
+  kung_fu_suggestion: string;
   yesterday_recap: string;
   stats: {
     yesterday_sessions: number;
@@ -110,6 +112,13 @@ export async function sendSuggestionEmail(suggestion: {
           <p style="margin: 0 0 4px; font-weight: 700; color: #92660A; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">🎯 Today's activity</p>
           <p style="margin: 0; color: #444; font-size: 16px; font-weight: 700;">${activityLabel}</p>
         </div>
+
+        <!-- KUNG FU RECOMMENDATION -->
+<div style="background: #1a1a2e; border-radius: 10px; padding: 16px 20px; margin-bottom: 24px;">
+  <p style="margin: 0 0 8px; font-weight: 700; color: #F5C842; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">🥋 Today's Kung Fu</p>
+  <p style="margin: 0 0 8px; color: #F5C842; font-size: 15px; font-weight: 700;">${suggestion.kung_fu_element}</p>
+  <p style="margin: 0; color: #ccc; font-size: 14px; line-height: 1.6;">${suggestion.kung_fu_suggestion}</p>
+</div>
 
         <!-- FOOTER -->
         <p style="font-size: 12px; color: #bbb; margin-top: 24px; text-align: center;">

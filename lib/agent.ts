@@ -94,6 +94,8 @@ export async function runAgent(): Promise<{
     yesterday_mood: number | null;
     yesterday_energy: number | null;
   };
+  kung_fu_element: string;
+  kung_fu_suggestion: string;
 }> {
   const supabase = createServerSupabaseClient();
   const today = new Date().toISOString().split("T")[0];
@@ -168,6 +170,46 @@ export async function runAgent(): Promise<{
     .limit(1);
 
   const dietLog = dietLogs?.[0] || null;
+
+  // Kung Fu sash level
+  const { data: sashData } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("key", "kung_fu_sash")
+    .limit(1);
+
+  const sashLevel = sashData?.[0]?.value || "red";
+
+  // Fetch available Kung Fu elements based on sash level
+  const sashOrder: Record<string, number> = { red: 1, yellow: 2, next: 3 };
+  const currentSashOrder = sashOrder[sashLevel] || 1;
+
+  const { data: kungFuElementsData } = await supabase
+    .from("kung_fu_elements")
+    .select("*")
+    .eq("active", true)
+    .order("sort_order", { ascending: true });
+
+  // Filter to elements available at current sash level
+  // Qi Gong is excluded from rotation as it's always practiced
+  const availableElements = (kungFuElementsData || [])
+    .filter((e) => (sashOrder[e.min_sash] || 1) <= currentSashOrder)
+    .filter((e) => e.name !== "Qi Gong");
+
+  // Recent Kung Fu sessions to determine rotation
+  const { data: recentKungFu } = await supabase
+    .from("activities")
+    .select("date, notes")
+    .eq("type", "kung_fu")
+    .order("date", { ascending: false })
+    .limit(10);
+
+  const recentKungFuSummary =
+    recentKungFu && recentKungFu.length > 0
+      ? recentKungFu
+          .map((k) => `- ${k.date.split("T")[0]}: ${k.notes || "no notes"}`)
+          .join("\n")
+      : "No recent Kung Fu sessions logged.";
 
   // -------------------------------------------------------------------------
   // STEP 2: Build the prompt
@@ -256,9 +298,21 @@ ${
 - cycling_indoor
 - cycling_outdoor (check weather)
 - fishing (outdoor — check weather)
-- kung_fu
 - gym
 - other
+
+## Daily Kung Fu Practice
+Current sash level: ${sashLevel}
+
+Available elements for rotation (excluding Qi Gong which is always practiced):
+${availableElements.map((e) => `- ${e.name}: ${e.description || ""}`).join("\n")}
+
+Recent Kung Fu sessions (use notes to determine which elements were practiced recently and rotate accordingly):
+${recentKungFuSummary}
+
+Select ONE element from the available list that hasn't been practiced recently.
+Always pair it with Qi Gong (minimum 5 minutes).
+If no recent sessions exist, start with Fa Jing.
 
 ## Kung Fu Content Library (if suggesting kung_fu, pick ONE element)
 ${KUNG_FU_LIBRARY.map((k) => `- ${k.id}: ${k.name} (energy required: ${k.energy_required}) — ${k.description}`).join("\n")}
@@ -276,8 +330,7 @@ ${KUNG_FU_LIBRARY.map((k) => `- ${k.id}: ${k.name} (energy required: ${k.energy_
 
 Respond in this exact JSON format with no markdown:
 {
-  "suggested_activity": "one of: running, cycling_indoor, cycling_outdoor, fishing, kung_fu, gym, other",
-  "kung_fu_element": "the kung_fu library id if applicable, otherwise null",
+  "suggested_activity": "one of: running, cycling_indoor, cycling_outdoor, fishing, gym, other",
   "suggestion_text": "3-4 sentences addressed directly to the user explaining what you suggest and why. Friendly and motivating. Start with a bold opener sentence marked with **double asterisks**.",
   "reasoning": "1-2 sentences of internal reasoning explaining your logic.",
   "yesterday_recap": "1-2 sentences summarising what the user did yesterday — activities and mood. If nothing was logged say so briefly. Start with a bold opener marked with **double asterisks**.",
@@ -286,7 +339,9 @@ Respond in this exact JSON format with no markdown:
     "yesterday_minutes": number or 0,
     "yesterday_mood": number or null,
     "yesterday_energy": number or null
-  }
+  },
+  "kung_fu_element": "the name of the rotating element selected from the available list",
+  "kung_fu_suggestion": "1-2 sentences explaining today's Kung Fu practice. Always starts with Qi Gong (min 5 mins) then the chosen element. Mention why this element was chosen based on recency."
 }`;
 
   // -------------------------------------------------------------------------
@@ -317,6 +372,8 @@ Respond in this exact JSON format with no markdown:
       suggested_activity: parsed.suggested_activity,
       suggestion_text: suggestionText,
       reasoning: parsed.reasoning,
+      kung_fu_element: parsed.kung_fu_element,
+      kung_fu_suggestion: parsed.kung_fu_suggestion,
       email_sent: false,
     },
     { onConflict: "suggestion_date" },
@@ -328,5 +385,7 @@ Respond in this exact JSON format with no markdown:
     reasoning: parsed.reasoning,
     yesterday_recap: parsed.yesterday_recap,
     stats: parsed.stats,
+    kung_fu_element: parsed.kung_fu_element,
+    kung_fu_suggestion: parsed.kung_fu_suggestion,
   };
 }

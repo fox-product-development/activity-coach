@@ -101,6 +101,9 @@ create table agent_suggestions (
 
   created_at timestamptz default now(),
 
+  kung_fu_element text,
+kung_fu_suggestion text,
+
   -- One suggestion per day
   unique(suggestion_date)
 );
@@ -169,3 +172,29 @@ create table settings (
 
 alter table settings enable row level security;
 create policy "Allow all on settings" on settings for all using (true) with check (true);
+
+create table kung_fu_elements (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  description text,
+  -- minimum sash level required: red, yellow, next
+  min_sash text not null default 'red' check (min_sash in ('red', 'yellow', 'next')),
+  -- order for display purposes
+  sort_order integer default 0,
+  active boolean default true,
+  created_at timestamptz default now()
+);
+
+alter table kung_fu_elements enable row level security;
+create policy "Allow all on kung_fu_elements" on kung_fu_elements 
+for all using (true) with check (true);
+
+-- Seed with current elements
+insert into kung_fu_elements (name, description, min_sash, sort_order) values
+('Qi Gong', 'Stationary breathing practice — minimum 5 minutes daily', 'red', 1),
+('Fa Jing', 'Explosive power practice combining single and triple strikes', 'red', 2),
+('Footwork combinations', 'Base stance, single step and double step combinations', 'red', 3),
+('Sup Luk Dun', '16 movements form — foundation of Lung Ying practice', 'red', 4),
+('Sam Tong', 'Second level form', 'yellow', 5),
+('Dan Bian', 'Third level form', 'next', 6),
+('Si Men Da', 'Third level form', 'next', 7);
