@@ -995,9 +995,39 @@ export default function Home() {
         }}
       >
         <div style={{ marginBottom: 32 }}>
-          <h1 style={{ margin: 0, fontSize: 28, color: colours.primaryDark }}>
-            ☀️ Activity Coach
-          </h1>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <h1 style={{ margin: 0, fontSize: 28, color: colours.primaryDark }}>
+              ☀️ Activity Coach
+            </h1>
+            <button
+              onClick={async () => {
+                const { createBrowserClient } = await import("@supabase/ssr");
+                const supabase = createBrowserClient(
+                  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                );
+                await supabase.auth.signOut();
+                window.location.href = "/login";
+              }}
+              style={{
+                background: "none",
+                border: `1px solid ${colours.border}`,
+                borderRadius: 8,
+                padding: "6px 12px",
+                fontSize: 12,
+                color: colours.textMuted,
+                cursor: "pointer",
+              }}
+            >
+              Sign out
+            </button>
+          </div>
           <p
             style={{
               color: colours.textMuted,
