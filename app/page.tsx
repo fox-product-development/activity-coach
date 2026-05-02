@@ -1261,7 +1261,12 @@ export default function Home() {
               {/* ADD BUTTON */}
               <button
                 onClick={openAddActivity}
-                style={{ ...buttonStyle, width: "100%", marginTop: 8 }}
+                style={{
+                  ...buttonStyle,
+                  width: "100%",
+                  marginTop: 8,
+                  marginBottom: 16,
+                }}
               >
                 ➕ Add Activity
               </button>
