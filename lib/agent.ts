@@ -18,71 +18,6 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-const KUNG_FU_LIBRARY = [
-  {
-    id: "basics",
-    name: "Basic Stances & Footwork",
-    description:
-      "Horse stance, bow stance, cat stance. Foundation of everything.",
-    energy_required: "low",
-  },
-  {
-    id: "forms",
-    name: "Form Practice",
-    description:
-      "Run through your current form sequences with focus on precision.",
-    energy_required: "medium",
-  },
-  {
-    id: "striking",
-    name: "Striking Combinations",
-    description: "Punch and palm strike combinations on the bag or in the air.",
-    energy_required: "high",
-  },
-  {
-    id: "kicks",
-    name: "Kicking Drills",
-    description: "Front kick, side kick, roundhouse — slow then fast.",
-    energy_required: "high",
-  },
-  {
-    id: "conditioning",
-    name: "Conditioning",
-    description: "Press-ups, squats, core work tailored to martial arts.",
-    energy_required: "high",
-  },
-  {
-    id: "breathing",
-    name: "Breathing & Qi Gong",
-    description: "Slow meditative breathing exercises and qi gong flows.",
-    energy_required: "low",
-  },
-  {
-    id: "stretching",
-    name: "Flexibility & Stretching",
-    description: "Deep stretching focused on kicks and hip mobility.",
-    energy_required: "low",
-  },
-  {
-    id: "sparring_drills",
-    name: "Sparring Drills",
-    description: "Reaction drills, block and counter combinations.",
-    energy_required: "medium",
-  },
-  {
-    id: "weapons",
-    name: "Weapons Work",
-    description: "Staff or sword form practice if equipment available.",
-    energy_required: "medium",
-  },
-  {
-    id: "meditation",
-    name: "Martial Meditation",
-    description: "Stillness practice, visualisation, mental focus training.",
-    energy_required: "low",
-  },
-];
-
 export async function runAgent(): Promise<{
   suggested_activity: string;
   suggestion_text: string;
@@ -314,8 +249,6 @@ Select ONE element from the available list that hasn't been practiced recently.
 Always pair it with Qi Gong (minimum 5 minutes).
 If no recent sessions exist, start with Fa Jing.
 
-## Kung Fu Content Library (if suggesting kung_fu, pick ONE element)
-${KUNG_FU_LIBRARY.map((k) => `- ${k.id}: ${k.name} (energy required: ${k.energy_required}) — ${k.description}`).join("\n")}
 
 ## Your Instructions
 1. Consider yesterday's mood and energy scores. Low energy = suggest gentler activities.
@@ -362,9 +295,7 @@ Respond in this exact JSON format with no markdown:
   // -------------------------------------------------------------------------
   // STEP 4: Save the suggestion to Supabase
   // -------------------------------------------------------------------------
-  const suggestionText = parsed.kung_fu_element
-    ? `${parsed.suggestion_text} (Focus: ${KUNG_FU_LIBRARY.find((k) => k.id === parsed.kung_fu_element)?.name})`
-    : parsed.suggestion_text;
+  const suggestionText = parsed.suggestion_text;
 
   await supabase.from("agent_suggestions").upsert(
     {
