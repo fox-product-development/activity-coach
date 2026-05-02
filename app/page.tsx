@@ -1258,81 +1258,6 @@ export default function Home() {
             <p>Loading...</p>
           ) : (
             <>
-              {/* 7 DAY VIEW */}
-              {Object.entries(days).map(([dateKey, dayActivities]) => (
-                <div key={dateKey} style={{ marginBottom: 16 }}>
-                  <p
-                    style={{
-                      margin: "0 0 8px",
-                      fontWeight: 700,
-                      color: colours.primaryDark,
-                      fontSize: 14,
-                    }}
-                  >
-                    {formatDate(dateKey)}
-                  </p>
-                  {dayActivities.length === 0 ? (
-                    <p
-                      style={{
-                        color: colours.textMuted,
-                        fontSize: 13,
-                        fontStyle: "italic",
-                        margin: "0 0 0 4px",
-                      }}
-                    >
-                      Rest day
-                    </p>
-                  ) : (
-                    dayActivities.map((activity) => (
-                      <div
-                        key={activity.id}
-                        onClick={() => openEditActivity(activity)}
-                        style={{
-                          background: colours.cardBg,
-                          border: `1px solid ${colours.cardBorder}`,
-                          borderLeft: `4px solid ${colours.primary}`,
-                          borderRadius: 8,
-                          padding: "10px 14px",
-                          marginBottom: 6,
-                          cursor: "pointer",
-                        }}
-                      >
-                        <strong style={{ color: colours.primaryDark }}>
-                          {activityLabels[activity.type] || activity.type}
-                        </strong>
-                        <span> — {activity.duration_minutes} mins</span>
-                        {activity.distance_km && (
-                          <span style={{ color: colours.textMuted }}>
-                            {" "}
-                            · {activity.distance_km}km
-                          </span>
-                        )}
-                        {activity.notes && (
-                          <p
-                            style={{
-                              margin: "4px 0 0",
-                              fontSize: 13,
-                              color: "#555",
-                            }}
-                          >
-                            {activity.notes}
-                          </p>
-                        )}
-                        <p
-                          style={{
-                            margin: "4px 0 0",
-                            fontSize: 11,
-                            color: colours.textMuted,
-                          }}
-                        >
-                          Tap to edit
-                        </p>
-                      </div>
-                    ))
-                  )}
-                </div>
-              ))}
-
               {/* ADD BUTTON */}
               <button
                 onClick={openAddActivity}
@@ -1342,8 +1267,82 @@ export default function Home() {
               </button>
             </>
           )}
-        </Section>
 
+          {/* 7 DAY VIEW */}
+          {Object.entries(days).map(([dateKey, dayActivities]) => (
+            <div key={dateKey} style={{ marginBottom: 16 }}>
+              <p
+                style={{
+                  margin: "0 0 8px",
+                  fontWeight: 700,
+                  color: colours.primaryDark,
+                  fontSize: 14,
+                }}
+              >
+                {formatDate(dateKey)}
+              </p>
+              {dayActivities.length === 0 ? (
+                <p
+                  style={{
+                    color: colours.textMuted,
+                    fontSize: 13,
+                    fontStyle: "italic",
+                    margin: "0 0 0 4px",
+                  }}
+                >
+                  Rest day
+                </p>
+              ) : (
+                dayActivities.map((activity) => (
+                  <div
+                    key={activity.id}
+                    onClick={() => openEditActivity(activity)}
+                    style={{
+                      background: colours.cardBg,
+                      border: `1px solid ${colours.cardBorder}`,
+                      borderLeft: `4px solid ${colours.primary}`,
+                      borderRadius: 8,
+                      padding: "10px 14px",
+                      marginBottom: 6,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <strong style={{ color: colours.primaryDark }}>
+                      {activityLabels[activity.type] || activity.type}
+                    </strong>
+                    <span> — {activity.duration_minutes} mins</span>
+                    {activity.distance_km && (
+                      <span style={{ color: colours.textMuted }}>
+                        {" "}
+                        · {activity.distance_km}km
+                      </span>
+                    )}
+                    {activity.notes && (
+                      <p
+                        style={{
+                          margin: "4px 0 0",
+                          fontSize: 13,
+                          color: "#555",
+                        }}
+                      >
+                        {activity.notes}
+                      </p>
+                    )}
+                    <p
+                      style={{
+                        margin: "4px 0 0",
+                        fontSize: 11,
+                        color: colours.textMuted,
+                      }}
+                    >
+                      Tap to edit
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          ))}
+        </Section>
         {/* DIET SECTION */}
         <Section title="Diet" emoji="🥗">
           {dietLog ? (

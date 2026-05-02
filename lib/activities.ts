@@ -60,11 +60,12 @@ Please extract the following and respond ONLY in JSON format with no markdown:
 {
   "source": "garmin" or "strava" or "unknown",
   "activity_type": "the type of activity e.g. running, cycling, swimming, gym, hiking — use lowercase",
-  "date": "YYYY-MM-DD format. IMPORTANT date rules:
-    - If the screenshot shows 'Today' or 'Today at HH:MM' → use ${today}
-    - If the screenshot shows 'Yesterday' → use ${yesterdayStr}
-    - If a specific date is shown → convert to YYYY-MM-DD format
-    - Never guess or infer a date from context",
+  "date": "YYYY-MM-DD HH:MM:SS format. IMPORTANT date and time rules:
+  - If the screenshot shows 'Today at HH:MM' → use ${today} and the shown time e.g. ${today} 10:21:00
+  - If the screenshot shows 'Yesterday at HH:MM' → use ${yesterdayStr} and the shown time
+  - If the screenshot shows 'Today' with no time → use ${today} 00:00:00
+  - If a specific date and time is shown → convert to YYYY-MM-DD HH:MM:SS format
+  - Never guess or infer a date from context",
   "duration_minutes": number (convert HH:MM:SS or MM:SS to total minutes, rounded to nearest minute),
   "distance_km": number or null (convert miles to km if needed),
   "avg_heart_rate": number or null (bpm — check both the stats fields AND any AI summary text for heart rate mentions),
