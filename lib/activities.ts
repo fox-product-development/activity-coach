@@ -67,7 +67,7 @@ Please extract the following and respond ONLY in JSON format with no markdown:
     - Never guess or infer a date from context",
   "duration_minutes": number (convert HH:MM:SS or MM:SS to total minutes, rounded to nearest minute),
   "distance_km": number or null (convert miles to km if needed),
-  "avg_heart_rate": number or null (bpm),
+  "avg_heart_rate": number or null (bpm — check both the stats fields AND any AI summary text for heart rate mentions),
   "avg_pace": "string in MM:SS/km format or null (for running activities)",
   "avg_speed_kmh": number or null (for cycling activities, convert mph if needed),
   "elevation_m": number or null (metres, convert feet if needed),
