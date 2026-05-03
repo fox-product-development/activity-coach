@@ -14,7 +14,15 @@ const colours = {
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("error") === "unauthorised") {
+        return "You are not authorised to access this app.";
+      }
+    }
+    return "";
+  });
 
   async function handleGoogleLogin() {
     setLoading(true);

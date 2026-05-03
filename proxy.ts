@@ -42,8 +42,23 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Not logged in — redirect to login
   if (!user) {
     return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  // Check if user is on the allowed list
+  const { data: allowedUser } = await supabase
+    .from("allowed_users")
+    .select("email")
+    .eq("email", user.email)
+    .limit(1);
+
+  if (!allowedUser || allowedUser.length === 0) {
+    // Sign them out and redirect to login with error
+    return NextResponse.redirect(
+      new URL("/login?error=unauthorised", request.url),
+    );
   }
 
   return supabaseResponse;
