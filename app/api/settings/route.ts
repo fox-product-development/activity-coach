@@ -1,30 +1,26 @@
-// app/api/settings/route.ts
-//
-// Simple GET and POST for the settings table.
-// Currently used for the goal setting but can handle
-// any key/value pair we add in future.
-
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServerSupabaseClient, getServerUser } from "@/lib/supabase";
 
-// GET /api/settings?key=goal
 export async function GET(request: NextRequest) {
   try {
+    const user = await getServerUser();
+    if (!user)
+      return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+
     const { searchParams } = new URL(request.url);
     const key = searchParams.get("key");
 
     const supabase = createServerSupabaseClient();
 
-    const query = supabase.from("settings").select("*");
+    const query = supabase.from("settings").select("*").eq("user_id", user.id);
+
     if (key) query.eq("key", key);
 
     const { data, error } = await query;
 
-    if (error) {
+    if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });
-    }
 
-    // If a specific key was requested return just the value
     if (key) {
       return NextResponse.json({ value: data?.[0]?.value || null });
     }
@@ -39,10 +35,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/settings
-// Creates or updates a setting
 export async function POST(request: NextRequest) {
   try {
+    const user = await getServerUser();
+    if (!user)
+      return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+
     const body = await request.json();
     const { key, value } = body;
 
@@ -58,15 +56,13 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from("settings")
       .upsert(
-        { key, value, updated_at: new Date().toISOString() },
-        { onConflict: "key" },
+        { user_id: user.id, key, value, updated_at: new Date().toISOString() },
+        { onConflict: "user_id,key" },
       )
       .select();
 
-    if (error) {
+    if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
     return NextResponse.json({ success: true, setting: data[0] });
   } catch (err) {
     console.error("Settings POST error:", err);

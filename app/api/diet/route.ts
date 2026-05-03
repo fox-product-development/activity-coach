@@ -1,26 +1,15 @@
-// app/api/diet/route.ts
-//
-// REVISED BEHAVIOUR:
-// Weight — logged for TODAY (morning weigh-in)
-// Diet — logged for YESTERDAY (evening Nutra Check upload)
-// They live in the same diet_logs table but on different date rows.
-//
-// GET — returns:
-//   - today's weight log (for weight popup check)
-//   - yesterday's diet log (for diet popup check)
-//   - recent logs for the diet section display
-//
-// POST — saves today's weight (log_date = today)
-// PUT — saves diet from image (log_date = extracted from screenshot)
-
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServerSupabaseClient, getServerUser } from "@/lib/supabase";
 import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function GET() {
   try {
+    const user = await getServerUser();
+    if (!user)
+      return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+
     const supabase = createServerSupabaseClient();
 
     const today = new Date().toISOString().split("T")[0];
@@ -28,24 +17,24 @@ export async function GET() {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split("T")[0];
 
-    // Check today's weight
     const { data: todayData } = await supabase
       .from("diet_logs")
       .select("*")
+      .eq("user_id", user.id)
       .eq("log_date", today)
       .limit(1);
 
-    // Check yesterday's diet
     const { data: yesterdayData } = await supabase
       .from("diet_logs")
       .select("*")
+      .eq("user_id", user.id)
       .eq("log_date", yesterdayStr)
       .limit(1);
 
-    // Recent logs for display in diet section (last 7 days)
     const { data: recentLogs } = await supabase
       .from("diet_logs")
       .select("*")
+      .eq("user_id", user.id)
       .order("log_date", { ascending: false })
       .limit(7);
 
@@ -76,6 +65,10 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getServerUser();
+    if (!user)
+      return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+
     const body = await request.json();
     const { weight_kg } = body;
 
@@ -87,22 +80,18 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createServerSupabaseClient();
-
-    // Weight always logs for TODAY
     const today = new Date().toISOString().split("T")[0];
 
     const { data, error } = await supabase
       .from("diet_logs")
       .upsert(
-        { log_date: today, weight_kg: Number(weight_kg) },
-        { onConflict: "log_date" },
+        { user_id: user.id, log_date: today, weight_kg: Number(weight_kg) },
+        { onConflict: "user_id,log_date" },
       )
       .select();
 
-    if (error) {
+    if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
     return NextResponse.json({ success: true, log: data[0] });
   } catch (err) {
     console.error("Diet POST error:", err);
@@ -115,6 +104,10 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const user = await getServerUser();
+    if (!user)
+      return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+
     const body = await request.json();
     const { imageBase64, mediaType } = body;
 
@@ -132,7 +125,6 @@ export async function PUT(request: NextRequest) {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // Send image to Claude for extraction
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
@@ -183,7 +175,6 @@ For numeric values, extract just the number without units.`,
     const clean = responseText.replace(/```json|```/g, "").trim();
     const extracted = JSON.parse(clean);
 
-    // Validate nutrition data exists
     const hasAnyNutrition =
       extracted.kcal != null ||
       extracted.protein_g != null ||
@@ -200,7 +191,6 @@ For numeric values, extract just the number without units.`,
       );
     }
 
-    // Resolve date from image
     const dateText = extracted.date_text?.toLowerCase() || "";
     let log_date: string;
 
@@ -243,13 +233,13 @@ For numeric values, extract just the number without units.`,
       log_date = parsed.toISOString().split("T")[0];
     }
 
-    // Save to Supabase
     const supabase = createServerSupabaseClient();
 
     const { data, error } = await supabase
       .from("diet_logs")
       .upsert(
         {
+          user_id: user.id,
           log_date,
           kcal: extracted.kcal,
           fat_g: extracted.fat_g,
@@ -262,13 +252,12 @@ For numeric values, extract just the number without units.`,
           kcal_pct: extracted.kcal_pct,
           protein_pct: extracted.protein_pct,
         },
-        { onConflict: "log_date" },
+        { onConflict: "user_id,log_date" },
       )
       .select();
 
-    if (error) {
+    if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });
-    }
 
     return NextResponse.json({
       success: true,

@@ -9,27 +9,27 @@ function formatBold(text: string): string {
   return text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
 }
 
-export async function sendSuggestionEmail(suggestion: {
-  suggested_activity: string;
-  suggestion_text: string;
-  reasoning: string;
-  kung_fu_element: string;
-  kung_fu_suggestion: string;
-  yesterday_recap: string;
-  stats: {
-    yesterday_sessions: number;
-    yesterday_minutes: number;
-    yesterday_mood: number | null;
-    yesterday_energy: number | null;
-  };
-}) {
+export async function sendSuggestionEmail(
+  suggestion: {
+    suggested_activity: string;
+    suggestion_text: string;
+    reasoning: string;
+    yesterday_recap: string;
+    kung_fu_element: string;
+    kung_fu_suggestion: string;
+    stats: {
+      yesterday_sessions: number;
+      yesterday_minutes: number;
+      yesterday_mood: number | null;
+      yesterday_energy: number | null;
+    };
+  },
+  toEmail: string,
+) {
   const fromEmail = process.env.RESEND_FROM_EMAIL;
-  const toEmail = process.env.RESEND_TO_EMAIL;
 
   if (!fromEmail || !toEmail) {
-    throw new Error(
-      "RESEND_FROM_EMAIL or RESEND_TO_EMAIL not set in .env.local",
-    );
+    throw new Error("RESEND_FROM_EMAIL not set or no recipient email provided");
   }
 
   const activityLabels: Record<string, string> = {

@@ -1,18 +1,19 @@
-// app/api/activities/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient, ActivityType } from "@/lib/supabase";
+import {
+  createServerSupabaseClient,
+  ActivityType,
+  getServerUser,
+} from "@/lib/supabase";
 import { extractActivityFromImage } from "@/lib/activities";
 
-// -------------------------------------------------------------------------
-// GET /api/activities
-// Returns last 7 days of activities grouped by date
-// -------------------------------------------------------------------------
 export async function GET() {
   try {
+    const user = await getServerUser();
+    if (!user)
+      return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+
     const supabase = createServerSupabaseClient();
 
-    // Get date 7 days ago
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const sevenDaysAgoStr = sevenDaysAgo.toISOString().split("T")[0];
@@ -20,14 +21,13 @@ export async function GET() {
     const { data, error } = await supabase
       .from("activities")
       .select("*")
+      .eq("user_id", user.id)
       .gte("date", sevenDaysAgoStr)
       .order("date", { ascending: false });
 
-    if (error) {
+    if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });
-    }
 
-    // Build a map of the last 7 days
     const days: Record<string, any[]> = {};
     for (let i = 0; i < 7; i++) {
       const d = new Date();
@@ -36,7 +36,6 @@ export async function GET() {
       days[key] = [];
     }
 
-    // Populate with activities
     for (const activity of data || []) {
       const key = activity.date.split("T")[0];
       if (days[key] !== undefined) {
@@ -54,16 +53,15 @@ export async function GET() {
   }
 }
 
-// -------------------------------------------------------------------------
-// POST /api/activities
-// Creates a new activity — either manual or from image
-// -------------------------------------------------------------------------
 export async function POST(request: NextRequest) {
   try {
+    const user = await getServerUser();
+    if (!user)
+      return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+
     const body = await request.json();
     const supabase = createServerSupabaseClient();
 
-    // Image upload path
     if (body.imageBase64) {
       const extracted = await extractActivityFromImage(
         body.imageBase64,
@@ -73,6 +71,7 @@ export async function POST(request: NextRequest) {
       const { data, error } = await supabase
         .from("activities")
         .insert({
+          user_id: user.id,
           type: extracted.type as ActivityType,
           date: extracted.date,
           duration_minutes: extracted.duration_minutes,
@@ -87,17 +86,14 @@ export async function POST(request: NextRequest) {
         })
         .select();
 
-      if (error) {
+      if (error)
         return NextResponse.json({ error: error.message }, { status: 500 });
-      }
-
       return NextResponse.json(
         { success: true, activity: data[0], extracted },
         { status: 201 },
       );
     }
 
-    // Manual entry path
     const { type, date, duration_minutes, notes, distance_km } = body;
 
     if (!type || !date || !duration_minutes) {
@@ -110,6 +106,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from("activities")
       .insert({
+        user_id: user.id,
         type: type as ActivityType,
         date,
         duration_minutes: Number(duration_minutes),
@@ -118,10 +115,8 @@ export async function POST(request: NextRequest) {
       })
       .select();
 
-    if (error) {
+    if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
     return NextResponse.json(
       { success: true, activity: data[0] },
       { status: 201 },

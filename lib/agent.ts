@@ -18,7 +18,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-export async function runAgent(): Promise<{
+export async function runAgent(userId: string): Promise<{
   suggested_activity: string;
   suggestion_text: string;
   reasoning: string;
@@ -52,6 +52,7 @@ export async function runAgent(): Promise<{
   const { data: yesterdayActivities } = await supabase
     .from("activities")
     .select("*")
+    .eq("user_id", userId)
     .gte("date", yesterdayStr)
     .lt("date", today)
     .order("date", { ascending: false });
@@ -60,6 +61,7 @@ export async function runAgent(): Promise<{
   const { data: recentActivities } = await supabase
     .from("activities")
     .select("*")
+    .eq("user_id", userId)
     .gte("date", sevenDaysAgoStr)
     .lt("date", yesterdayStr)
     .order("date", { ascending: false });
@@ -68,6 +70,7 @@ export async function runAgent(): Promise<{
   const { data: moodLogs } = await supabase
     .from("mood_logs")
     .select("*")
+    .eq("user_id", userId)
     .eq("log_date", yesterdayStr)
     .limit(1);
 
@@ -77,6 +80,7 @@ export async function runAgent(): Promise<{
   const { data: recentSuggestions } = await supabase
     .from("agent_suggestions")
     .select("*")
+    .eq("user_id", userId)
     .order("suggestion_date", { ascending: false })
     .limit(7);
 
@@ -92,6 +96,7 @@ export async function runAgent(): Promise<{
   const { data: goalData } = await supabase
     .from("settings")
     .select("value")
+    .eq("user_id", userId)
     .eq("key", "goal")
     .limit(1);
 
@@ -101,6 +106,7 @@ export async function runAgent(): Promise<{
   const { data: dietLogs } = await supabase
     .from("diet_logs")
     .select("*")
+    .eq("user_id", userId)
     .eq("log_date", yesterdayStr)
     .limit(1);
 
@@ -110,6 +116,7 @@ export async function runAgent(): Promise<{
   const { data: sashData } = await supabase
     .from("settings")
     .select("value")
+    .eq("user_id", userId)
     .eq("key", "kung_fu_sash")
     .limit(1);
 
@@ -299,6 +306,7 @@ Respond in this exact JSON format with no markdown:
 
   await supabase.from("agent_suggestions").upsert(
     {
+      user_id: userId,
       suggestion_date: today,
       suggested_activity: parsed.suggested_activity,
       suggestion_text: suggestionText,
@@ -307,7 +315,7 @@ Respond in this exact JSON format with no markdown:
       kung_fu_suggestion: parsed.kung_fu_suggestion,
       email_sent: false,
     },
-    { onConflict: "suggestion_date" },
+    { onConflict: "user_id,suggestion_date" },
   );
 
   return {
