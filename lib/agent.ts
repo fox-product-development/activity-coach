@@ -121,6 +121,15 @@ export async function runAgent(userId: string): Promise<{
     .limit(1);
 
   const sashLevel = sashData?.[0]?.value || "red";
+  // Check if kung fu is enabled for this user
+  const { data: kungFuEnabledData } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("user_id", userId)
+    .eq("key", "kung_fu_enabled")
+    .limit(1);
+
+  const kungFuEnabled = kungFuEnabledData?.[0]?.value === "true";
 
   // Fetch available Kung Fu elements based on sash level
   const sashOrder: Record<string, number> = { red: 1, yellow: 2, next: 3 };
@@ -243,8 +252,24 @@ ${
 - gym
 - other
 
+${
+  kungFuEnabled
+    ? `
 ## Daily Kung Fu Practice
 Current sash level: ${sashLevel}
+
+Available elements for rotation (excluding Qi Gong which is always practiced):
+${availableElements.map((e) => `- ${e.name}: ${e.description || ""}`).join("\n")}
+
+Recent Kung Fu sessions (use notes to determine which elements were practiced recently and rotate accordingly):
+${recentKungFuSummary}
+
+Select ONE element from the available list that hasn't been practiced recently.
+Always pair it with Qi Gong (minimum 5 minutes).
+If no recent sessions exist, start with Fa Jing.
+`
+    : "## Daily Kung Fu Practice\nKung Fu is not enabled for this user — do not generate a Kung Fu recommendation."
+}
 
 Available elements for rotation (excluding Qi Gong which is always practiced):
 ${availableElements.map((e) => `- ${e.name}: ${e.description || ""}`).join("\n")}
@@ -280,8 +305,8 @@ Respond in this exact JSON format with no markdown:
     "yesterday_mood": number or null,
     "yesterday_energy": number or null
   },
-  "kung_fu_element": "the name of the rotating element selected from the available list",
-  "kung_fu_suggestion": "1-2 sentences explaining today's Kung Fu practice. Always starts with Qi Gong (min 5 mins) then the chosen element. Mention why this element was chosen based on recency."
+ "kung_fu_element": "the name of the rotating element, or null if kung fu is disabled",
+"kung_fu_suggestion": "1-2 sentences for today's kung fu practice, or null if kung fu is disabled"
 }`;
 
   // -------------------------------------------------------------------------
