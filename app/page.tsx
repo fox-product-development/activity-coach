@@ -339,7 +339,6 @@ export default function Home() {
     setDietLog(data.todayLog);
     setYesterdayStr(data.yesterdayStr);
 
-    // Weight check is for TODAY, diet check is for YESTERDAY
     if (!data.hasWeight) {
       setPopupStep("weight");
     } else if (!data.hasDiet) {
@@ -349,7 +348,6 @@ export default function Home() {
     }
     setCheckComplete(true);
   }
-
   // -------------------------------------------------------------------------
   // ACTIVITY POPUP HELPERS
   // -------------------------------------------------------------------------
@@ -528,9 +526,10 @@ export default function Home() {
     const data = await res.json();
 
     if (res.ok) {
-      setDietLog(data.log);
       setPopupStep("none");
       setDietImage(null);
+      // Refresh from API to get correct today's data rather than the uploaded entry
+      await checkDietStatus();
     } else {
       setDietMessage(data.error || "Something went wrong");
     }

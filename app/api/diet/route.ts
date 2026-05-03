@@ -150,7 +150,7 @@ export async function PUT(request: NextRequest) {
 
 Please extract the following and respond ONLY in JSON format with no markdown:
 {
-  "date_text": "the exact text shown at the top for the date period e.g. Yesterday, Today, or the actual date shown",
+  "date_text": "the exact text shown at the top for the date period e.g. Yesterday, Today, Friday 1 May, or the actual date shown. Copy it exactly as shown.",
   "kcal": number or null,
   "fat_g": number or null,
   "sat_fat_g": number or null,
@@ -199,7 +199,9 @@ For numeric values, extract just the number without units.`,
     } else if (dateText.includes("yesterday")) {
       log_date = yesterdayStr;
     } else {
-      const parsed = new Date(extracted.date_text);
+      // Add current year to help parse short dates like "Fri 1 May"
+      const dateWithYear = `${extracted.date_text} ${new Date().getFullYear()}`;
+      const parsed = new Date(dateWithYear);
 
       if (isNaN(parsed.getTime())) {
         return NextResponse.json(
@@ -230,7 +232,11 @@ For numeric values, extract just the number without units.`,
         );
       }
 
-      log_date = parsed.toISOString().split("T")[0];
+      // Format date directly without timezone conversion
+      const year = parsed.getFullYear();
+      const month = String(parsed.getMonth() + 1).padStart(2, "0");
+      const day = String(parsed.getDate()).padStart(2, "0");
+      log_date = `${year}-${month}-${day}`;
     }
 
     const supabase = createServerSupabaseClient();
