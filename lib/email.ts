@@ -23,6 +23,11 @@ export async function sendSuggestionEmail(
       yesterday_mood: number | null;
       yesterday_energy: number | null;
     };
+    yesterday_diet: {
+      kcal: number | null;
+      protein_g: number | null;
+      weight_kg: number | null;
+    } | null;
   },
   toEmail: string,
 ) {
@@ -75,6 +80,15 @@ export async function sendSuggestionEmail(
       : null,
     suggestion.stats.yesterday_energy
       ? `Energy ${energyEmoji} ${suggestion.stats.yesterday_energy}/5`
+      : null,
+    suggestion.yesterday_diet?.kcal
+      ? `${suggestion.yesterday_diet.kcal} kcal`
+      : null,
+    suggestion.yesterday_diet?.protein_g
+      ? `Protein ${suggestion.yesterday_diet.protein_g}g`
+      : null,
+    suggestion.yesterday_diet?.weight_kg
+      ? `⚖️ ${suggestion.yesterday_diet.weight_kg}kg`
       : null,
   ]
     .filter(Boolean)

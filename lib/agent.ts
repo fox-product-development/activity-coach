@@ -23,6 +23,11 @@ export async function runAgent(userId: string): Promise<{
   suggestion_text: string;
   reasoning: string;
   yesterday_recap: string;
+  yesterday_diet: {
+    kcal: number | null;
+    protein_g: number | null;
+    weight_kg: number | null;
+  } | null;
   stats: {
     yesterday_sessions: number;
     yesterday_minutes: number;
@@ -362,6 +367,13 @@ Respond in this exact JSON format with no markdown:
       reasoning: parsed.reasoning,
       kung_fu_element: parsed.kung_fu_element,
       kung_fu_suggestion: parsed.kung_fu_suggestion,
+      yesterday_diet: dietLog
+        ? {
+            kcal: dietLog.kcal || null,
+            protein_g: dietLog.protein_g || null,
+            weight_kg: dietLog.weight_kg || null,
+          }
+        : null,
       email_sent: false,
     },
     { onConflict: "user_id,suggestion_date" },
@@ -375,5 +387,12 @@ Respond in this exact JSON format with no markdown:
     stats: parsed.stats,
     kung_fu_element: parsed.kung_fu_element,
     kung_fu_suggestion: parsed.kung_fu_suggestion,
+    yesterday_diet: dietLog
+      ? {
+          kcal: dietLog.kcal || null,
+          protein_g: dietLog.protein_g || null,
+          weight_kg: dietLog.weight_kg || null,
+        }
+      : null,
   };
 }
