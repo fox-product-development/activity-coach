@@ -1,14 +1,4 @@
 // lib/agent.ts
-//
-// WHY THIS FILE EXISTS:
-// This is the core reasoning engine of the app. It gathers all available
-// context (activities, mood, weather) and passes it to Claude to generate
-// a personalised daily suggestion.
-//
-// WHY IT LIVES IN /lib AND NOT /api:
-// The agent logic itself is a utility — it can be called from the cron job,
-// from an API route, or anywhere else. Keeping it in /lib means we're not
-// tied to one specific route.
 
 import Anthropic from "@anthropic-ai/sdk";
 import { createServerSupabaseClient } from "@/lib/supabase";
@@ -40,7 +30,6 @@ export async function runAgent(userId: string): Promise<{
   const supabase = createServerSupabaseClient();
   const today = new Date().toISOString().split("T")[0];
 
-  // Yesterday and 7 days ago for date ranges
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = yesterday.toISOString().split("T")[0];
@@ -49,11 +38,7 @@ export async function runAgent(userId: string): Promise<{
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const sevenDaysAgoStr = sevenDaysAgo.toISOString().split("T")[0];
 
-  // -------------------------------------------------------------------------
-  // STEP 1: Gather all context
-  // -------------------------------------------------------------------------
-
-  // Yesterday's activities — primary input
+  // Yesterday's activities
   const { data: yesterdayActivities } = await supabase
     .from("activities")
     .select("*")
@@ -62,7 +47,7 @@ export async function runAgent(userId: string): Promise<{
     .lt("date", today)
     .order("date", { ascending: false });
 
-  // Last 7 days activities — recovery and pattern context
+  // Last 7 days activities
   const { data: recentActivities } = await supabase
     .from("activities")
     .select("*")
@@ -71,7 +56,7 @@ export async function runAgent(userId: string): Promise<{
     .lt("date", yesterdayStr)
     .order("date", { ascending: false });
 
-  // Yesterday's mood log
+  // Yesterday's mood
   const { data: moodLogs } = await supabase
     .from("mood_logs")
     .select("*")
@@ -81,7 +66,7 @@ export async function runAgent(userId: string): Promise<{
 
   const yesterdayMood = moodLogs?.[0] || null;
 
-  // Recent suggestions (so the agent doesn't repeat itself)
+  // Recent suggestions
   const { data: recentSuggestions } = await supabase
     .from("agent_suggestions")
     .select("*")
@@ -97,7 +82,7 @@ export async function runAgent(userId: string): Promise<{
     console.error("Weather fetch failed, continuing without it:", err);
   }
 
-  // User's current goal
+  // User's goal
   const { data: goalData } = await supabase
     .from("settings")
     .select("value")
@@ -107,7 +92,7 @@ export async function runAgent(userId: string): Promise<{
 
   const userGoal = goalData?.[0]?.value || null;
 
-  // Yesterday's diet and weight log
+  // Yesterday's diet and weight
   const { data: dietLogs } = await supabase
     .from("diet_logs")
     .select("*")
@@ -117,7 +102,7 @@ export async function runAgent(userId: string): Promise<{
 
   const dietLog = dietLogs?.[0] || null;
 
-  // Fetch user's enabled activities with full details from activity_types
+  // User's enabled activities
   const { data: userActivitiesData } = await supabase
     .from("user_activities")
     .select("activity_type")
@@ -127,7 +112,6 @@ export async function runAgent(userId: string): Promise<{
   const userActivityKeys =
     userActivitiesData?.map((a) => a.activity_type) || [];
 
-  // Get full details for each activity
   const { data: activityTypeDetails } = await supabase
     .from("activity_types")
     .select("*")
@@ -135,7 +119,7 @@ export async function runAgent(userId: string): Promise<{
 
   const userActivities = activityTypeDetails || [];
 
-  // Kung Fu sash level
+  // Kung Fu settings
   const { data: sashData } = await supabase
     .from("settings")
     .select("value")
@@ -144,7 +128,7 @@ export async function runAgent(userId: string): Promise<{
     .limit(1);
 
   const sashLevel = sashData?.[0]?.value || "red";
-  // Check if kung fu is enabled for this user
+
   const { data: kungFuEnabledData } = await supabase
     .from("settings")
     .select("value")
@@ -154,7 +138,6 @@ export async function runAgent(userId: string): Promise<{
 
   const kungFuEnabled = kungFuEnabledData?.[0]?.value === "true";
 
-  // Fetch available Kung Fu elements based on sash level
   const sashOrder: Record<string, number> = { red: 1, yellow: 2, next: 3 };
   const currentSashOrder = sashOrder[sashLevel] || 1;
 
@@ -164,16 +147,14 @@ export async function runAgent(userId: string): Promise<{
     .eq("active", true)
     .order("sort_order", { ascending: true });
 
-  // Filter to elements available at current sash level
-  // Qi Gong is excluded from rotation as it's always practiced
   const availableElements = (kungFuElementsData || [])
     .filter((e) => (sashOrder[e.min_sash] || 1) <= currentSashOrder)
     .filter((e) => e.name !== "Qi Gong");
 
-  // Recent Kung Fu sessions to determine rotation
   const { data: recentKungFu } = await supabase
     .from("activities")
     .select("date, notes")
+    .eq("user_id", userId)
     .eq("type", "kung_fu")
     .order("date", { ascending: false })
     .limit(10);
@@ -188,7 +169,6 @@ export async function runAgent(userId: string): Promise<{
   // -------------------------------------------------------------------------
   // STEP 2: Build the prompt
   // -------------------------------------------------------------------------
-
   const prompt = `You are a personal activity coach. Your job is to suggest ONE activity for today based on the context below.
 
 ## User's Current Goal
@@ -258,6 +238,7 @@ ${
         .join("\n")
     : "No recent suggestions."
 }
+
 ## Availability Constraints
 ${
   ["Saturday", "Sunday"].includes(
@@ -268,7 +249,7 @@ ${
       : "No weekend constraints."
     : "All activities available today."
 }
-  
+
 ## Available Activities
 ${
   userActivities.length > 0
@@ -300,17 +281,6 @@ If no recent sessions exist, start with Fa Jing.
     : "## Daily Kung Fu Practice\nKung Fu is not enabled for this user — do not generate a Kung Fu recommendation."
 }
 
-Available elements for rotation (excluding Qi Gong which is always practiced):
-${availableElements.map((e) => `- ${e.name}: ${e.description || ""}`).join("\n")}
-
-Recent Kung Fu sessions (use notes to determine which elements were practiced recently and rotate accordingly):
-${recentKungFuSummary}
-
-Select ONE element from the available list that hasn't been practiced recently.
-Always pair it with Qi Gong (minimum 5 minutes).
-If no recent sessions exist, start with Fa Jing.
-
-
 ## Your Instructions
 1. Consider yesterday's mood and energy scores. Low energy = suggest gentler activities.
 2. Consider the weather. Don't suggest outdoor activities if conditions are poor.
@@ -324,7 +294,7 @@ If no recent sessions exist, start with Fa Jing.
 
 Respond in this exact JSON format with no markdown:
 {
-  "suggested_activity": "one of: running, cycling_indoor, cycling_outdoor, fishing, gym, other",
+  "suggested_activity": "one of the activity type_keys from the available activities list",
   "suggestion_text": "3-4 sentences addressed directly to the user explaining what you suggest and why. Friendly and motivating. Start with a bold opener sentence marked with **double asterisks**.",
   "reasoning": "1-2 sentences of internal reasoning explaining your logic.",
   "yesterday_recap": "1-2 sentences summarising what the user did yesterday — activities and mood. If nothing was logged say so briefly. Start with a bold opener marked with **double asterisks**.",
@@ -334,8 +304,8 @@ Respond in this exact JSON format with no markdown:
     "yesterday_mood": number or null,
     "yesterday_energy": number or null
   },
- "kung_fu_element": "the name of the rotating element, or null if kung fu is disabled",
-"kung_fu_suggestion": "1-2 sentences for today's kung fu practice, or null if kung fu is disabled"
+  "kung_fu_element": "the name of the rotating element, or null if kung fu is disabled",
+  "kung_fu_suggestion": "1-2 sentences for today's kung fu practice, or null if kung fu is disabled"
 }`;
 
   // -------------------------------------------------------------------------
@@ -349,31 +319,21 @@ Respond in this exact JSON format with no markdown:
 
   const responseText =
     message.content[0].type === "text" ? message.content[0].text : "";
-
   const clean = responseText.replace(/```json|```/g, "").trim();
   const parsed = JSON.parse(clean);
 
   // -------------------------------------------------------------------------
-  // STEP 4: Save the suggestion to Supabase
+  // STEP 4: Save to Supabase
   // -------------------------------------------------------------------------
-  const suggestionText = parsed.suggestion_text;
-
   await supabase.from("agent_suggestions").upsert(
     {
       user_id: userId,
       suggestion_date: today,
       suggested_activity: parsed.suggested_activity,
-      suggestion_text: suggestionText,
+      suggestion_text: parsed.suggestion_text,
       reasoning: parsed.reasoning,
       kung_fu_element: parsed.kung_fu_element,
       kung_fu_suggestion: parsed.kung_fu_suggestion,
-      yesterday_diet: dietLog
-        ? {
-            kcal: dietLog.kcal || null,
-            protein_g: dietLog.protein_g || null,
-            weight_kg: dietLog.weight_kg || null,
-          }
-        : null,
       email_sent: false,
     },
     { onConflict: "user_id,suggestion_date" },
@@ -381,7 +341,7 @@ Respond in this exact JSON format with no markdown:
 
   return {
     suggested_activity: parsed.suggested_activity,
-    suggestion_text: suggestionText,
+    suggestion_text: parsed.suggestion_text,
     reasoning: parsed.reasoning,
     yesterday_recap: parsed.yesterday_recap,
     stats: parsed.stats,
