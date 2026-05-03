@@ -112,6 +112,21 @@ export async function runAgent(userId: string): Promise<{
 
   const dietLog = dietLogs?.[0] || null;
 
+  // Fetch user's enabled activities
+  const { data: userActivitiesData } = await supabase
+    .from("user_activities")
+    .select("activity_type")
+    .eq("user_id", userId)
+    .eq("enabled", true);
+
+  const userActivities = userActivitiesData?.map((a) => a.activity_type) || [
+    "running",
+    "cycling_indoor",
+    "cycling_outdoor",
+    "fishing",
+    "gym",
+  ];
+
   // Kung Fu sash level
   const { data: sashData } = await supabase
     .from("settings")
@@ -240,17 +255,20 @@ ${
   ["Saturday", "Sunday"].includes(
     new Date().toLocaleDateString("en-GB", { weekday: "long" }),
   )
-    ? "Today is a weekend — do NOT suggest gym as it is an office gym and not accessible."
-    : "Gym is available today."
+    ? userActivities.includes("gym")
+      ? "Today is a weekend — do NOT suggest gym as it is an office gym and not accessible."
+      : "No weekend constraints."
+    : "All activities available today."
 }
   
 ## Available Activities
-- running (outdoor — check weather)
-- cycling_indoor
-- cycling_outdoor (check weather)
-- fishing (outdoor — check weather)
-- gym
-- other
+${userActivities
+  .map((activity) => {
+    const outdoorActivities = ["running", "cycling_outdoor", "fishing"];
+    const isOutdoor = outdoorActivities.includes(activity);
+    return `- ${activity}${isOutdoor ? " (outdoor — check weather)" : ""}`;
+  })
+  .join("\n")}
 
 ${
   kungFuEnabled

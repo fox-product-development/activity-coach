@@ -209,6 +209,16 @@ export default function Home() {
   const [activityImageSubmitting, setActivityImageSubmitting] = useState(false);
   const [activityImageMessage, setActivityImageMessage] = useState("");
   const activityFileInputRef = useRef<HTMLInputElement>(null);
+  const [userActivityTypes, setUserActivityTypes] = useState<any[]>([]);
+  const [availableActivityTypes, setAvailableActivityTypes] = useState<any[]>(
+    [],
+  );
+  const [activityTypesOpen, setActivityTypesOpen] = useState(false);
+  const [removeActivityOpen, setRemoveActivityOpen] = useState(false);
+  const [activityToRemove, setActivityToRemove] = useState<any>(null);
+  const [customActivityName, setCustomActivityName] = useState("");
+  const [customActivityOutdoor, setCustomActivityOutdoor] = useState(false);
+  const [activityTypesSaving, setActivityTypesSaving] = useState(false);
 
   // MOOD STATE
   const [moodScore, setMoodScore] = useState(3);
@@ -230,7 +240,15 @@ export default function Home() {
     fetchSettings();
     fetchKungFuData();
     fetchMotivation();
+    fetchActivityTypes();
   }, []);
+
+  async function fetchActivityTypes() {
+    const res = await fetch("/api/activity-types");
+    const data = await res.json();
+    setUserActivityTypes(data.current || []);
+    setAvailableActivityTypes(data.available || []);
+  }
 
   async function fetchActivities() {
     setActivitiesLoading(true);
@@ -803,6 +821,252 @@ export default function Home() {
         </Popup>
       )}
 
+      {/* REMOVE ACTIVITY CONFIRMATION */}
+      {removeActivityOpen && activityToRemove && (
+        <Popup>
+          <h2 style={{ margin: "0 0 8px", color: colours.primaryDark }}>
+            Remove Activity
+          </h2>
+          <p
+            style={{
+              color: colours.textMuted,
+              fontSize: 14,
+              margin: "0 0 20px",
+            }}
+          >
+            Remove{" "}
+            <strong>
+              {activityToRemove.emoji} {activityToRemove.name}
+            </strong>{" "}
+            from your list?
+          </p>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={async () => {
+                await fetch("/api/activity-types", {
+                  method: "DELETE",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ type_key: activityToRemove.type_key }),
+                });
+                setRemoveActivityOpen(false);
+                setActivityToRemove(null);
+                fetchActivityTypes();
+              }}
+              style={{ ...buttonStyle, background: "#DC2626", color: "white" }}
+            >
+              Yes, remove
+            </button>
+            <button
+              onClick={() => {
+                setRemoveActivityOpen(false);
+                setActivityToRemove(null);
+              }}
+              style={skipStyle}
+            >
+              Cancel
+            </button>
+          </div>
+        </Popup>
+      )}
+
+      {/* ACTIVITY TYPES MANAGEMENT POPUP */}
+      {activityTypesOpen && (
+        <Popup>
+          <h2 style={{ margin: "0 0 20px", color: colours.primaryDark }}>
+            ⚙️ Manage Activities
+          </h2>
+
+          {/* CURRENT ACTIVITIES */}
+          <p
+            style={{
+              fontWeight: 700,
+              color: colours.primaryDark,
+              margin: "0 0 8px",
+              fontSize: 14,
+            }}
+          >
+            Your Activities
+          </p>
+          {userActivityTypes.map((activity) => (
+            <div
+              key={activity.type_key}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                background: colours.cardBg,
+                border: `1px solid ${colours.cardBorder}`,
+                borderRadius: 8,
+                padding: "10px 14px",
+                marginBottom: 8,
+              }}
+            >
+              <span
+                style={{
+                  color: colours.primaryDark,
+                  fontWeight: 600,
+                  fontSize: 14,
+                }}
+              >
+                {activity.emoji} {activity.name}
+              </span>
+              <button
+                onClick={() => {
+                  setActivityToRemove(activity);
+                  setRemoveActivityOpen(true);
+                }}
+                style={{
+                  background: "none",
+                  border: `1px solid #DC2626`,
+                  borderRadius: 6,
+                  padding: "4px 10px",
+                  color: "#DC2626",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+
+          <hr style={{ margin: "16px 0", borderColor: colours.border }} />
+
+          {/* AVAILABLE TO ADD */}
+          {availableActivityTypes.length > 0 && (
+            <>
+              <p
+                style={{
+                  fontWeight: 700,
+                  color: colours.primaryDark,
+                  margin: "0 0 8px",
+                  fontSize: 14,
+                }}
+              >
+                Add from library
+              </p>
+              {availableActivityTypes.map((activity) => (
+                <div
+                  key={activity.type_key}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    background: colours.pageBg,
+                    border: `1px solid ${colours.border}`,
+                    borderRadius: 8,
+                    padding: "10px 14px",
+                    marginBottom: 8,
+                  }}
+                >
+                  <span style={{ color: colours.text, fontSize: 14 }}>
+                    {activity.emoji} {activity.name}
+                  </span>
+                  <button
+                    onClick={async () => {
+                      await fetch("/api/activity-types", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          type_key: activity.type_key,
+                          name: activity.name,
+                          is_outdoor: activity.is_outdoor,
+                          emoji: activity.emoji,
+                        }),
+                      });
+                      fetchActivityTypes();
+                    }}
+                    style={{
+                      ...buttonStyle,
+                      fontSize: 12,
+                      padding: "4px 12px",
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+              ))}
+              <hr style={{ margin: "16px 0", borderColor: colours.border }} />
+            </>
+          )}
+
+          {/* CUSTOM ACTIVITY */}
+          <p
+            style={{
+              fontWeight: 700,
+              color: colours.primaryDark,
+              margin: "0 0 8px",
+              fontSize: 14,
+            }}
+          >
+            Add custom activity
+          </p>
+          <input
+            type="text"
+            value={customActivityName}
+            onChange={(e) => setCustomActivityName(e.target.value)}
+            placeholder="e.g. Rock Climbing"
+            style={{ ...inputStyle, marginBottom: 10 }}
+          />
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 16,
+              fontSize: 14,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={customActivityOutdoor}
+              onChange={(e) => setCustomActivityOutdoor(e.target.checked)}
+            />
+            Outdoor activity (weather will be considered)
+          </label>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={async () => {
+                if (!customActivityName.trim()) return;
+                setActivityTypesSaving(true);
+                const typeKey = customActivityName
+                  .trim()
+                  .toLowerCase()
+                  .replace(/\s+/g, "_");
+                await fetch("/api/activity-types", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    type_key: typeKey,
+                    name: customActivityName.trim(),
+                    is_outdoor: customActivityOutdoor,
+                    emoji: customActivityOutdoor ? "🌿" : "🏃",
+                  }),
+                });
+                setCustomActivityName("");
+                setCustomActivityOutdoor(false);
+                setActivityTypesSaving(false);
+                fetchActivityTypes();
+              }}
+              disabled={activityTypesSaving || !customActivityName.trim()}
+              style={{
+                ...buttonStyle,
+                opacity: !customActivityName.trim() ? 0.5 : 1,
+              }}
+            >
+              {activityTypesSaving ? "Adding..." : "Add Activity"}
+            </button>
+            <button
+              onClick={() => setActivityTypesOpen(false)}
+              style={skipStyle}
+            >
+              Close
+            </button>
+          </div>
+        </Popup>
+      )}
+
       {/* ACTIVITY ADD/EDIT POPUP */}
       {(activityPopupMode === "add" || activityPopupMode === "edit") && (
         <Popup>
@@ -872,9 +1136,9 @@ export default function Home() {
                     onChange={(e) => setActivityType(e.target.value)}
                     style={{ ...inputStyle, marginTop: 4 }}
                   >
-                    {Object.entries(activityLabels).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
+                    {userActivityTypes.map((activity) => (
+                      <option key={activity.type_key} value={activity.type_key}>
+                        {activity.emoji} {activity.name}
                       </option>
                     ))}
                   </select>
@@ -1475,6 +1739,18 @@ export default function Home() {
                 }}
               >
                 ➕ Add Activity
+              </button>
+              <button
+                onClick={() => setActivityTypesOpen(true)}
+                style={{
+                  ...buttonStyle,
+                  width: "100%",
+                  marginTop: 8,
+                  background: colours.primaryLight,
+                  color: colours.primaryDark,
+                }}
+              >
+                ⚙️ Manage Activities
               </button>
             </>
           )}
