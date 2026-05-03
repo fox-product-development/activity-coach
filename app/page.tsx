@@ -131,7 +131,42 @@ const activityLabels: Record<string, string> = {
 // -------------------------------------------------------------------------
 // MAIN PAGE
 // -------------------------------------------------------------------------
+
 export default function Home() {
+  // SETTINGS STATE
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [kungFuEnabled, setKungFuEnabled] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+
+  // KUNG FU STATE
+  const [kungFuSash, setKungFuSash] = useState("red");
+  const [kungFuRecommendation, setKungFuRecommendation] = useState<{
+    element: string;
+    suggestion: string;
+  } | null>(null);
+  const [kungFuElements, setKungFuElements] = useState<any[]>([]);
+  const [levelUpOpen, setLevelUpOpen] = useState(false);
+  const [levelUpSaving, setLevelUpSaving] = useState(false);
+  const [markDoneOpen, setMarkDoneOpen] = useState(false);
+
+  const sashColours: Record<string, string> = {
+    red: "#FF2400",
+    yellow: "#F7F70C",
+    next: "#00CC44",
+  };
+
+  const sashNextLevel: Record<string, string> = {
+    red: "yellow",
+    yellow: "next",
+    next: "next",
+  };
+
+  const sashLabels: Record<string, string> = {
+    red: "Red Sash",
+    yellow: "Yellow Sash",
+    next: "Next Level",
+  };
+
   // GOAL STATE
   const [goal, setGoal] = useState("");
   const [goalEditing, setGoalEditing] = useState(false);
@@ -192,6 +227,8 @@ export default function Home() {
     fetchMood();
     checkDietStatus();
     fetchGoal();
+    fetchSettings();
+    fetchKungFuData();
     fetchMotivation();
   }, []);
 
@@ -208,6 +245,61 @@ export default function Home() {
     const data = await res.json();
     setTodayMood(data.todayLog);
     setMoodLoading(false);
+  }
+  async function fetchSettings() {
+    const res = await fetch("/api/settings?key=kung_fu_enabled");
+    const data = await res.json();
+    setKungFuEnabled(data.value === "true");
+  }
+  async function fetchKungFuData() {
+    // Get sash level
+    const sashRes = await fetch("/api/settings?key=kung_fu_sash");
+    const sashData = await sashRes.json();
+    setKungFuSash(sashData.value || "red");
+
+    // Get today's kung fu recommendation
+    const todayRes = await fetch("/api/agent/today");
+    const todayData = await todayRes.json();
+    if (todayData.kung_fu_suggestion) {
+      setKungFuRecommendation({
+        element: todayData.kung_fu_element || "",
+        suggestion: todayData.kung_fu_suggestion,
+      });
+    }
+
+    // Get kung fu elements from database
+    const elementsRes = await fetch("/api/kungfu/elements");
+    const elementsData = await elementsRes.json();
+    setKungFuElements(elementsData.elements || []);
+  }
+
+  async function handleLevelUp() {
+    setLevelUpSaving(true);
+    const nextLevel = sashNextLevel[kungFuSash];
+
+    await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "kung_fu_sash", value: nextLevel }),
+    });
+
+    setKungFuSash(nextLevel);
+    setLevelUpSaving(false);
+    setLevelUpOpen(false);
+  }
+
+  async function handleSettingsSave() {
+    setSettingsSaving(true);
+    await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        key: "kung_fu_enabled",
+        value: String(kungFuEnabled),
+      }),
+    });
+    setSettingsSaving(false);
+    setSettingsOpen(false);
   }
 
   async function fetchGoal() {
@@ -520,6 +612,74 @@ export default function Home() {
   // -------------------------------------------------------------------------
   return (
     <>
+      {/* SETTINGS POPUP */}
+      {settingsOpen && (
+        <Popup>
+          <h2 style={{ margin: "0 0 20px", color: colours.primaryDark }}>
+            ⚙️ Settings
+          </h2>
+
+          <div
+            style={{
+              background: colours.primaryLight,
+              border: `1px solid ${colours.border}`,
+              borderRadius: 8,
+              padding: "16px",
+              marginBottom: 20,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <div>
+              <p
+                style={{
+                  margin: "0 0 4px",
+                  fontWeight: 700,
+                  color: colours.primaryDark,
+                }}
+              >
+                🥋 Kung Fu Training
+              </p>
+              <p style={{ margin: 0, fontSize: 12, color: colours.textMuted }}>
+                {kungFuEnabled
+                  ? "Daily Kung Fu recommendations enabled"
+                  : "Kung Fu recommendations disabled"}
+              </p>
+            </div>
+            <button
+              onClick={() => setKungFuEnabled(!kungFuEnabled)}
+              style={{
+                background: kungFuEnabled ? colours.primary : "#e5e5e5",
+                border: "none",
+                borderRadius: 20,
+                padding: "6px 16px",
+                fontSize: 13,
+                fontWeight: 700,
+                color: kungFuEnabled ? colours.primaryDark : colours.textMuted,
+                cursor: "pointer",
+                minWidth: 60,
+              }}
+            >
+              {kungFuEnabled ? "On" : "Off"}
+            </button>
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={handleSettingsSave}
+              disabled={settingsSaving}
+              style={buttonStyle}
+            >
+              {settingsSaving ? "Saving..." : "Save"}
+            </button>
+            <button onClick={() => setSettingsOpen(false)} style={skipStyle}>
+              Cancel
+            </button>
+          </div>
+        </Popup>
+      )}
+
       {/* WEIGHT POPUP */}
       {checkComplete && popupStep === "weight" && (
         <Popup>
@@ -1005,28 +1165,44 @@ export default function Home() {
             <h1 style={{ margin: 0, fontSize: 28, color: colours.primaryDark }}>
               ☀️ Activity Coach
             </h1>
-            <button
-              onClick={async () => {
-                const { createBrowserClient } = await import("@supabase/ssr");
-                const supabase = createBrowserClient(
-                  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-                );
-                await supabase.auth.signOut();
-                window.location.href = "/login";
-              }}
-              style={{
-                background: "none",
-                border: `1px solid ${colours.border}`,
-                borderRadius: 8,
-                padding: "6px 12px",
-                fontSize: 12,
-                color: colours.textMuted,
-                cursor: "pointer",
-              }}
-            >
-              Sign out
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => setSettingsOpen(true)}
+                style={{
+                  background: "none",
+                  border: `1px solid ${colours.border}`,
+                  borderRadius: 8,
+                  padding: "6px 12px",
+                  fontSize: 10,
+                  color: colours.textMuted,
+                  cursor: "pointer",
+                }}
+              >
+                Settings
+              </button>
+              <button
+                onClick={async () => {
+                  const { createBrowserClient } = await import("@supabase/ssr");
+                  const supabase = createBrowserClient(
+                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                  );
+                  await supabase.auth.signOut();
+                  window.location.href = "/login";
+                }}
+                style={{
+                  background: "none",
+                  border: `1px solid ${colours.border}`,
+                  borderRadius: 8,
+                  padding: "6px 12px",
+                  fontSize: 10,
+                  color: colours.textMuted,
+                  cursor: "pointer",
+                }}
+              >
+                Sign out
+              </button>
+            </div>
           </div>
           <p
             style={{
@@ -1378,6 +1554,7 @@ export default function Home() {
             </div>
           ))}
         </Section>
+
         {/* DIET SECTION */}
         <Section title="Diet" emoji="🥗">
           {dietLog ? (
@@ -1469,6 +1646,426 @@ export default function Home() {
             </p>
           )}
         </Section>
+        {/* KUNG FU SECTION — only show if enabled */}
+        {kungFuEnabled && (
+          <>
+            {/* LEVEL UP POPUP */}
+            {levelUpOpen && (
+              <Popup>
+                <h2 style={{ margin: "0 0 8px", color: colours.primaryDark }}>
+                  🥋 Level Up!
+                </h2>
+                <p
+                  style={{
+                    color: colours.textMuted,
+                    fontSize: 14,
+                    margin: "0 0 20px",
+                  }}
+                >
+                  Progress from <strong>{sashLabels[kungFuSash]}</strong> to{" "}
+                  <strong>{sashLabels[sashNextLevel[kungFuSash]]}</strong>?
+                </p>
+                <div
+                  style={{
+                    background: sashColours[sashNextLevel[kungFuSash]],
+                    borderRadius: 8,
+                    padding: "12px 16px",
+                    marginBottom: 20,
+                    textAlign: "center",
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: 0,
+                      color: "white",
+                      fontWeight: 700,
+                      fontSize: 16,
+                    }}
+                  >
+                    {sashLabels[sashNextLevel[kungFuSash]]}
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    onClick={handleLevelUp}
+                    disabled={levelUpSaving}
+                    style={buttonStyle}
+                  >
+                    {levelUpSaving ? "Saving..." : "Yes, level up!"}
+                  </button>
+                  <button
+                    onClick={() => setLevelUpOpen(false)}
+                    style={skipStyle}
+                  >
+                    Not yet
+                  </button>
+                </div>
+              </Popup>
+            )}
+
+            {/* MARK AS DONE POPUP */}
+            {markDoneOpen && (
+              <Popup>
+                <h2 style={{ margin: "0 0 4px", color: colours.primaryDark }}>
+                  🥋 Log Kung Fu Session
+                </h2>
+                <p
+                  style={{
+                    color: colours.textMuted,
+                    fontSize: 14,
+                    margin: "0 0 20px",
+                  }}
+                >
+                  How long was your session?
+                </p>
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontWeight: 600 }}>
+                    Duration (minutes)
+                    <br />
+                    <input
+                      type="number"
+                      value={activityDuration}
+                      onChange={(e) => setActivityDuration(e.target.value)}
+                      min={1}
+                      style={{ ...inputStyle, marginTop: 4 }}
+                    />
+                  </label>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontWeight: 600 }}>
+                    Notes
+                    <br />
+                    <textarea
+                      value={activityNotes}
+                      onChange={(e) => setActivityNotes(e.target.value)}
+                      rows={2}
+                      style={{ ...inputStyle, marginTop: 4 }}
+                    />
+                  </label>
+                </div>
+                {activityMessage && (
+                  <p
+                    style={{
+                      color: colours.error,
+                      fontSize: 13,
+                      margin: "0 0 12px",
+                    }}
+                  >
+                    {activityMessage}
+                  </p>
+                )}
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    onClick={async () => {
+                      setActivitySubmitting(true);
+                      const res = await fetch("/api/activities", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          type: "kung_fu",
+                          date: new Date().toISOString().split("T")[0],
+                          duration_minutes: activityDuration,
+                          notes:
+                            activityNotes ||
+                            (kungFuRecommendation
+                              ? `${kungFuRecommendation.element}`
+                              : "Kung Fu session"),
+                        }),
+                      });
+                      const data = await res.json();
+                      if (res.ok) {
+                        setMarkDoneOpen(false);
+                        setActivityDuration("");
+                        setActivityNotes("");
+                        fetchActivities();
+                      } else {
+                        setActivityMessage(
+                          data.error || "Something went wrong",
+                        );
+                      }
+                      setActivitySubmitting(false);
+                    }}
+                    disabled={activitySubmitting || !activityDuration}
+                    style={{
+                      ...buttonStyle,
+                      opacity: !activityDuration ? 0.5 : 1,
+                    }}
+                  >
+                    {activitySubmitting ? "Saving..." : "Log Session"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMarkDoneOpen(false);
+                      setActivityDuration("");
+                      setActivityNotes("");
+                      setActivityMessage("");
+                    }}
+                    style={skipStyle}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </Popup>
+            )}
+
+            {/* KUNG FU SASH SECTION */}
+            <div
+              style={{
+                marginBottom: 12,
+                borderRadius: 12,
+                overflow: "hidden",
+                border: `1px solid ${sashColours[kungFuSash]}`,
+              }}
+            >
+              {/* SASH HEADER */}
+              <button
+                onClick={() => {
+                  const el = document.getElementById("kungfu-content");
+                  if (el)
+                    el.style.display =
+                      el.style.display === "none" ? "block" : "none";
+                }}
+                style={{
+                  width: "100%",
+                  background: sashColours[kungFuSash],
+                  border: "none",
+                  padding: "16px 20px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  cursor: "pointer",
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: "white",
+                }}
+              >
+                <span>🥋 Kung Fu — {sashLabels[kungFuSash]}</span>
+                <span style={{ fontSize: 12 }}>▼ Show</span>
+              </button>
+
+              {/* CONTENT */}
+              <div
+                id="kungfu-content"
+                style={{ display: "none", background: colours.white }}
+              >
+                {/* DAILY TRAINING */}
+                <div style={{ padding: "20px 20px 0" }}>
+                  <h3
+                    style={{ margin: "0 0 12px", color: colours.primaryDark }}
+                  >
+                    Daily Training
+                  </h3>
+                  {kungFuRecommendation ? (
+                    <div
+                      style={{
+                        background: colours.cardBg,
+                        border: `1px solid ${colours.cardBorder}`,
+                        borderLeft: `4px solid ${sashColours[kungFuSash]}`,
+                        borderRadius: 8,
+                        padding: "12px 16px",
+                        marginBottom: 12,
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin: "0 0 4px",
+                          fontWeight: 700,
+                          color: colours.primaryDark,
+                        }}
+                      >
+                        Qi Gong + {kungFuRecommendation.element}
+                      </p>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 13,
+                          color: "#555",
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {kungFuRecommendation.suggestion.replace(
+                          /\*\*(.*?)\*\*/g,
+                          "$1",
+                        )}
+                      </p>
+                    </div>
+                  ) : (
+                    <p
+                      style={{
+                        color: colours.textMuted,
+                        fontStyle: "italic",
+                        fontSize: 14,
+                      }}
+                    >
+                      Today's recommendation will appear after your morning
+                      email.
+                    </p>
+                  )}
+                  <button
+                    onClick={() => {
+                      setActivityNotes(
+                        kungFuRecommendation
+                          ? `Qi Gong + ${kungFuRecommendation.element}`
+                          : "Kung Fu session",
+                      );
+                      setMarkDoneOpen(true);
+                    }}
+                    style={{
+                      ...buttonStyle,
+                      fontSize: 13,
+                      padding: "8px 16px",
+                      marginBottom: 20,
+                    }}
+                  >
+                    ✅ Mark as Done
+                  </button>
+                </div>
+
+                <hr style={{ margin: "0 20px", borderColor: colours.border }} />
+
+                {/* TRAINING GUIDE */}
+                <div
+                  style={{
+                    borderTop: `1px solid ${colours.border}`,
+                    borderRadius: 8,
+                    marginTop: 12,
+                    marginLeft: 20,
+                    marginRight: 20,
+                    marginBottom: 20,
+                    overflow: "hidden",
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      const el = document.getElementById(
+                        "training-guide-content",
+                      );
+                      if (el)
+                        el.style.display =
+                          el.style.display === "none" ? "block" : "none";
+                    }}
+                    style={{
+                      width: "100%",
+                      background: colours.primaryLight,
+                      border: "none",
+                      padding: "16px 20px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      cursor: "pointer",
+                      fontSize: 15,
+                      fontWeight: 700,
+                      color: colours.primaryDark,
+                    }}
+                  >
+                    <span>📖 Training Guide</span>
+                    <span style={{ fontSize: 12, color: colours.textMuted }}>
+                      ▼ Show
+                    </span>
+                  </button>
+
+                  <div
+                    id="training-guide-content"
+                    style={{ display: "none", padding: "0 20px 20px" }}
+                  >
+                    {kungFuElements.map((element) => {
+                      const sashOrder: Record<string, number> = {
+                        red: 1,
+                        yellow: 2,
+                        next: 3,
+                      };
+                      const currentOrder = sashOrder[kungFuSash] || 1;
+                      const elementOrder = sashOrder[element.min_sash] || 1;
+                      const isLocked = elementOrder > currentOrder;
+                      const isQiGong = element.name === "Qi Gong";
+
+                      return (
+                        <div
+                          key={element.id}
+                          style={{
+                            padding: "10px 14px",
+                            marginBottom: 8,
+                            borderRadius: 8,
+                            background: isLocked ? "#f5f5f5" : colours.cardBg,
+                            border: `1px solid ${isLocked ? "#ddd" : colours.cardBorder}`,
+                            opacity: isLocked ? 0.6 : 1,
+                          }}
+                        >
+                          <p
+                            style={{
+                              margin: "0 0 2px",
+                              fontWeight: 700,
+                              color: isLocked ? "#999" : colours.primaryDark,
+                              fontSize: 14,
+                            }}
+                          >
+                            {isQiGong ? "🧘 " : ""}
+                            {element.name}
+                            {isLocked && (
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  marginLeft: 8,
+                                  color: "#bbb",
+                                }}
+                              >
+                                🔒 {element.min_sash} sash
+                              </span>
+                            )}
+                            {isQiGong && (
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  marginLeft: 8,
+                                  color: colours.textMuted,
+                                }}
+                              >
+                                Daily
+                              </span>
+                            )}
+                          </p>
+                          {element.description && (
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: 12,
+                                color: isLocked ? "#bbb" : "#555",
+                              }}
+                            >
+                              {element.description}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* LEVEL UP BUTTON */}
+                {kungFuSash !== "next" && (
+                  <div style={{ padding: "0 20px 20px" }}>
+                    <button
+                      onClick={() => setLevelUpOpen(true)}
+                      style={{
+                        width: "100%",
+                        padding: "10px",
+                        background: sashColours[sashNextLevel[kungFuSash]],
+                        border: "none",
+                        borderRadius: 8,
+                        color: "white",
+                        fontWeight: 700,
+                        fontSize: 14,
+                        cursor: "pointer",
+                      }}
+                    >
+                      🎖️ Level Up to {sashLabels[sashNextLevel[kungFuSash]]}!
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </main>
     </>
   );
