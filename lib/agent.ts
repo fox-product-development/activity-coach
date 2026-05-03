@@ -112,20 +112,23 @@ export async function runAgent(userId: string): Promise<{
 
   const dietLog = dietLogs?.[0] || null;
 
-  // Fetch user's enabled activities
+  // Fetch user's enabled activities with full details from activity_types
   const { data: userActivitiesData } = await supabase
     .from("user_activities")
     .select("activity_type")
     .eq("user_id", userId)
     .eq("enabled", true);
 
-  const userActivities = userActivitiesData?.map((a) => a.activity_type) || [
-    "running",
-    "cycling_indoor",
-    "cycling_outdoor",
-    "fishing",
-    "gym",
-  ];
+  const userActivityKeys =
+    userActivitiesData?.map((a) => a.activity_type) || [];
+
+  // Get full details for each activity
+  const { data: activityTypeDetails } = await supabase
+    .from("activity_types")
+    .select("*")
+    .in("type_key", userActivityKeys.length > 0 ? userActivityKeys : ["none"]);
+
+  const userActivities = activityTypeDetails || [];
 
   // Kung Fu sash level
   const { data: sashData } = await supabase
@@ -255,20 +258,23 @@ ${
   ["Saturday", "Sunday"].includes(
     new Date().toLocaleDateString("en-GB", { weekday: "long" }),
   )
-    ? userActivities.includes("gym")
+    ? userActivities.some((a) => a.type_key === "gym")
       ? "Today is a weekend — do NOT suggest gym as it is an office gym and not accessible."
       : "No weekend constraints."
     : "All activities available today."
 }
   
 ## Available Activities
-${userActivities
-  .map((activity) => {
-    const outdoorActivities = ["running", "cycling_outdoor", "fishing"];
-    const isOutdoor = outdoorActivities.includes(activity);
-    return `- ${activity}${isOutdoor ? " (outdoor — check weather)" : ""}`;
-  })
-  .join("\n")}
+${
+  userActivities.length > 0
+    ? userActivities
+        .map(
+          (a) =>
+            `- ${a.type_key}: ${a.name}${a.is_outdoor ? " (outdoor — check weather)" : " (indoor)"}`,
+        )
+        .join("\n")
+    : "No activities configured — suggest a gentle walk or rest day."
+}
 
 ${
   kungFuEnabled
