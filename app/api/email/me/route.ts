@@ -7,10 +7,11 @@ import { sendSuggestionEmail } from "@/lib/email";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
+  const { searchParams } = new URL(request.url);
+  const key = searchParams.get("key");
+  const testSecret = process.env.TEST_SECRET;
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!testSecret || key !== testSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
