@@ -10,7 +10,7 @@ import { getWeather } from "@/lib/weather";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-export async function runWeeklyAgent(): Promise<{
+export async function runWeeklyAgent(userId: string): Promise<{
   summary_text: string;
   subject_line: string;
   stats: {
@@ -33,27 +33,76 @@ export async function runWeeklyAgent(): Promise<{
   // -------------------------------------------------------------------------
   // GATHER DATA
   // -------------------------------------------------------------------------
+  // Fetch user's enabled activities
+  const { data: userActivitiesData } = await supabase
+    .from("user_activities")
+    .select("activity_type")
+    .eq("user_id", userId)
+    .eq("enabled", true);
+
+  const userActivityKeys =
+    userActivitiesData?.map((a) => a.activity_type) || [];
+
+  const { data: activityTypeDetails } = await supabase
+    .from("activity_types")
+    .select("*")
+    .in("type_key", userActivityKeys.length > 0 ? userActivityKeys : ["none"]);
+
+  const userActivities = activityTypeDetails || [];
+
+  // Fetch Kung Fu settings
+  const { data: kungFuEnabledData } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("user_id", userId)
+    .eq("key", "kung_fu_enabled")
+    .limit(1);
+
+  const kungFuEnabled = kungFuEnabledData?.[0]?.value === "true";
+
+  const { data: sashData } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("user_id", userId)
+    .eq("key", "kung_fu_sash")
+    .limit(1);
+
+  const sashLevel = sashData?.[0]?.value || "red";
+
+  // Fetch Kung Fu suggestions from the week
+  const { data: kungFuSuggestions } = await supabase
+    .from("agent_suggestions")
+    .select("suggestion_date, kung_fu_element, kung_fu_suggestion")
+    .eq("user_id", userId)
+    .gte("suggestion_date", sevenDaysAgoStr)
+    .not("kung_fu_element", "is", null)
+    .order("suggestion_date", { ascending: true });
+
   const { data: activities } = await supabase
     .from("activities")
     .select("*")
+    .eq("user_id", userId)
     .gte("date", sevenDaysAgoStr)
     .order("date", { ascending: true });
 
   const { data: moodLogs } = await supabase
     .from("mood_logs")
     .select("*")
+    .eq("user_id", userId)
     .gte("log_date", sevenDaysAgoStr)
     .order("log_date", { ascending: true });
 
   const { data: dietLogs } = await supabase
     .from("diet_logs")
     .select("*")
+    .eq("user_id", userId)
     .gte("log_date", sevenDaysAgoStr)
     .order("log_date", { ascending: true });
 
   const { data: suggestions } = await supabase
     .from("agent_suggestions")
     .select("*")
+    .eq("user_id", userId)
     .gte("suggestion_date", sevenDaysAgoStr)
     .order("suggestion_date", { ascending: true });
 
@@ -129,6 +178,9 @@ export async function runWeeklyAgent(): Promise<{
   // -------------------------------------------------------------------------
   const prompt = `You are a personal activity coach writing a friendly weekly summary email.
 
+  ## User's Activities
+${userActivities.map((a) => `- ${a.name}${a.is_outdoor ? " (outdoor)" : " (indoor)"}`).join("\n")}
+
 ## Week Period
 ${sevenDaysAgoStr} to ${todayStr}
 
@@ -184,6 +236,24 @@ ${
         )
         .join("\n")
     : "No suggestions logged."
+}
+
+## Kung Fu This Week
+${
+  kungFuEnabled
+    ? `
+Current sash level: ${sashLevel}
+Kung Fu sessions this week:
+${
+  kungFuSuggestions && kungFuSuggestions.length > 0
+    ? kungFuSuggestions
+        .map((s) => `- ${s.suggestion_date}: ${s.kung_fu_element}`)
+        .join("\n")
+    : "No Kung Fu sessions logged this week."
+}
+Note: Reference Kung Fu practice in the weekly summary if relevant — mention consistency or suggest refocusing if sessions were missed.
+`
+    : "Kung Fu is not enabled for this user — do not mention it."
 }
 
 ## Your Task
