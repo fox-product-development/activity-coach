@@ -8,7 +8,6 @@ export async function GET() {
     if (!user)
       return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
 
-    console.log("Agent triggered for user:", user.id);
     const result = await runAgent(user.id);
     return NextResponse.json({ success: true, result });
   } catch (err) {

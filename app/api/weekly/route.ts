@@ -53,7 +53,6 @@ export async function GET(request: NextRequest) {
 
     for (const user of filteredUsers) {
       try {
-        console.log("Running weekly agent for:", user.email);
         const { summary_text, subject_line, stats } = await runWeeklyAgent(
           user.id,
         );

@@ -49,7 +49,6 @@ export async function GET(request: NextRequest) {
 
     for (const user of users) {
       try {
-        console.log("Running agent for user:", user.email);
         const result = await runAgent(user.id);
 
         await sendSuggestionEmail(result, user.email!);
