@@ -181,6 +181,10 @@ export default function Home() {
   const [goalInput, setGoalInput] = useState("");
   const [goalSaving, setGoalSaving] = useState(false);
 
+  // NAME STATE
+  const [userName, setUserName] = useState("");
+  const [nameInput, setNameInput] = useState("");
+
   // DAILY MOTIVATION STATE
   const [motivation, setMotivation] = useState("");
 
@@ -276,6 +280,11 @@ export default function Home() {
     const res = await fetch("/api/settings?key=kung_fu_enabled");
     const data = await res.json();
     setKungFuEnabled(data.value === "true");
+
+    const nameRes = await fetch("/api/settings?key=name");
+    const nameData = await nameRes.json();
+    setUserName(nameData.value || "");
+    setNameInput(nameData.value || "");
   }
   async function fetchKungFuData() {
     // Get sash level
@@ -316,6 +325,8 @@ export default function Home() {
 
   async function handleSettingsSave() {
     setSettingsSaving(true);
+
+    // Save kung fu enabled setting
     await fetch("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -324,6 +335,20 @@ export default function Home() {
         value: String(kungFuEnabled),
       }),
     });
+
+    // Save name if provided
+    if (nameInput.trim()) {
+      await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: "name",
+          value: nameInput.trim(),
+        }),
+      });
+      setUserName(nameInput.trim());
+    }
+
     setSettingsSaving(false);
     setSettingsOpen(false);
   }
@@ -644,6 +669,36 @@ export default function Home() {
             ⚙️ Settings
           </h2>
 
+          {/* NAME */}
+          <div style={{ marginBottom: 20 }}>
+            <p
+              style={{
+                margin: "0 0 8px",
+                fontWeight: 700,
+                color: colours.primaryDark,
+                fontSize: 14,
+              }}
+            >
+              👤 Your Name
+            </p>
+            <input
+              type="text"
+              value={nameInput}
+              placeholder="Enter your name"
+              onChange={(e) => setNameInput(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: `1px solid ${colours.border}`,
+                fontSize: 14,
+                background: colours.primaryLight,
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          {/* KUNG FU TOGGLE */}
           <div
             style={{
               background: colours.primaryLight,
