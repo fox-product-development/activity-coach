@@ -148,7 +148,7 @@ export async function runAgent(userId: string): Promise<{
     .order("sort_order", { ascending: true });
 
   const availableElements = (kungFuElementsData || [])
-    .filter((e) => (sashOrder[e.min_sash] || 1) <= currentSashOrder)
+    .filter((e) => (sashOrder[e.min_sash] || 1) <= currentSashOrder + 1)
     .filter((e) => e.name !== "Qi Gong");
 
   const { data: recentKungFu } = await supabase
@@ -269,7 +269,9 @@ ${
 Current sash level: ${sashLevel}
 
 Available elements for rotation (excluding Qi Gong which is always practiced):
-${availableElements.map((e) => `- ${e.name}: ${e.description || ""}`).join("\n")}
+${availableElements.map((e) => `- ${e.name}: ${e.description || ""}${(sashOrder[e.min_sash] || 1) > currentSashOrder ? " ⭐ next belt level" : ""}`).join("\n")}
+
+Elements marked ⭐ are from the next belt level — occasionally suggest these to encourage progression, but don't overdo it.
 
 Recent Kung Fu sessions (use notes to determine which elements were practiced recently and rotate accordingly):
 ${recentKungFuSummary}

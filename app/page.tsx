@@ -2206,7 +2206,7 @@ export default function Home() {
                     marginTop: 12,
                     marginLeft: 20,
                     marginRight: 20,
-                    marginBottom: 20,
+                    marginBottom: 0,
                     overflow: "hidden",
                   }}
                 >
@@ -2241,78 +2241,73 @@ export default function Home() {
 
                   <div
                     id="training-guide-content"
-                    style={{ display: "none", padding: "0 20px 20px" }}
+                    style={{
+                      display: "none",
+                      padding: "0 20px 20px",
+                      marginBottom: 16,
+                    }}
                   >
-                    {kungFuElements.map((element) => {
-                      const sashOrder: Record<string, number> = {
-                        red: 1,
-                        yellow: 2,
-                        next: 3,
-                      };
-                      const currentOrder = sashOrder[kungFuSash] || 1;
-                      const elementOrder = sashOrder[element.min_sash] || 1;
-                      const isLocked = elementOrder > currentOrder;
-                      const isQiGong = element.name === "Qi Gong";
-
-                      return (
-                        <div
-                          key={element.id}
-                          style={{
-                            padding: "10px 14px",
-                            marginBottom: 8,
-                            borderRadius: 8,
-                            background: isLocked ? "#f5f5f5" : colours.cardBg,
-                            border: `1px solid ${isLocked ? "#ddd" : colours.cardBorder}`,
-                            opacity: isLocked ? 0.6 : 1,
-                          }}
-                        >
-                          <p
+                    {kungFuElements
+                      .filter((element) => {
+                        const sashOrder: Record<string, number> = {
+                          red: 1,
+                          yellow: 2,
+                          next: 3,
+                        };
+                        const currentOrder = sashOrder[kungFuSash] || 1;
+                        const elementOrder = sashOrder[element.min_sash] || 1;
+                        return elementOrder <= currentOrder + 1;
+                      })
+                      .map((element) => {
+                        const isQiGong = element.name === "Qi Gong";
+                        return (
+                          <div
+                            key={element.id}
                             style={{
-                              margin: "0 0 2px",
-                              fontWeight: 700,
-                              color: isLocked ? "#999" : colours.primaryDark,
-                              fontSize: 14,
+                              padding: "10px 14px",
+                              marginBottom: 8,
+                              marginTop: 8,
+                              borderRadius: 8,
+                              background: colours.cardBg,
+                              border: `1px solid ${colours.cardBorder}`,
                             }}
                           >
-                            {isQiGong ? "🧘 " : ""}
-                            {element.name}
-                            {isLocked && (
-                              <span
-                                style={{
-                                  fontSize: 11,
-                                  marginLeft: 8,
-                                  color: "#bbb",
-                                }}
-                              >
-                                🔒 {element.min_sash} sash
-                              </span>
-                            )}
-                            {isQiGong && (
-                              <span
-                                style={{
-                                  fontSize: 11,
-                                  marginLeft: 8,
-                                  color: colours.textMuted,
-                                }}
-                              >
-                                Daily
-                              </span>
-                            )}
-                          </p>
-                          {element.description && (
                             <p
                               style={{
-                                margin: 0,
-                                fontSize: 12,
-                                color: isLocked ? "#bbb" : "#555",
+                                margin: "0 0 2px",
+                                fontWeight: 700,
+                                color: colours.primaryDark,
+                                fontSize: 14,
                               }}
                             >
-                              {element.description}
+                              {isQiGong ? "🧘 " : ""}
+                              {element.name}
+                              {isQiGong && (
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    marginLeft: 8,
+                                    color: colours.textMuted,
+                                  }}
+                                >
+                                  Daily
+                                </span>
+                              )}
                             </p>
-                          )}
-                        </div>
-                      );
-                    })}
+                            {element.description && (
+                              <p
+                                style={{
+                                  margin: 0,
+                                  fontSize: 12,
+                                  color: "#555",
+                                }}
+                              >
+                                {element.description}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
                   </div>
                 </div>
 
