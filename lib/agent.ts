@@ -112,10 +112,10 @@ export async function runAgent(userId: string): Promise<{
 
   const dietLog = dietLogs?.[0] || null;
 
-  // User's enabled activities
+  // User's enabled activities with mood and energy scores
   const { data: userActivitiesData } = await supabase
     .from("user_activities")
-    .select("activity_type")
+    .select("activity_type, energy_cost, mood_boost")
     .eq("user_id", userId)
     .eq("enabled", true);
 
@@ -127,7 +127,17 @@ export async function runAgent(userId: string): Promise<{
     .select("*")
     .in("type_key", userActivityKeys.length > 0 ? userActivityKeys : ["none"]);
 
-  const userActivities = activityTypeDetails || [];
+  // Merge mood/energy scores into activity details
+  const userActivities = (activityTypeDetails || []).map((a) => {
+    const scores = userActivitiesData?.find(
+      (u) => u.activity_type === a.type_key,
+    );
+    return {
+      ...a,
+      energy_cost: scores?.energy_cost ?? 3,
+      mood_boost: scores?.mood_boost ?? 3,
+    };
+  });
 
   // Kung Fu settings
   const { data: sashData } = await supabase
@@ -268,7 +278,7 @@ ${
     ? userActivities
         .map(
           (a) =>
-            `- ${a.type_key}: ${a.name}${a.is_outdoor ? " (outdoor — check weather)" : " (indoor)"}`,
+            `- ${a.type_key}: ${a.name}${a.is_outdoor ? " (outdoor — check weather)" : " (indoor)"} | energy_cost: ${a.energy_cost}/5, mood_boost: ${a.mood_boost}/5`,
         )
         .join("\n")
     : "No activities configured — suggest a gentle walk or rest day."
@@ -296,16 +306,21 @@ If no recent sessions exist, start with Fa Jing.
 }
 
 ## Your Instructions
-1. Consider yesterday's mood and energy scores. Low energy = suggest gentler activities.
-2. Consider the weather. Don't suggest outdoor activities if conditions are poor.
-3. Yesterday's activities are the primary input. Use the last 7 days for recovery and pattern awareness only.
-4. If suggesting kung_fu, pick the most appropriate element from the library based on energy level and what hasn't been done recently.
-5. Don't repeat a recent suggestion unless it's clearly the best option.
-6. Be encouraging and specific. Mention the weather, their energy, or their recent pattern in your message.
-7. If diet data is available, factor it in. Low protein yesterday = mention it's a good day for a post-workout meal. Low calories = suggest something less intense. High sugar = note it and suggest balancing activity.
-8. If weight is logged, acknowledge it naturally if relevant — don't make it the focus but it adds useful context about the person's health journey.
-9. Factor in the user's goal when making suggestions — tailor the activity and messaging to support it.
-
+1. Use the user's mood and energy scores alongside each activity's energy_cost and mood_boost to guide your suggestion:
+   - Low mood + low energy → prefer low energy_cost, high mood_boost activities
+   - Good mood + low energy → prefer moderate energy_cost activities, describe them as lighter sessions
+   - Low mood + good energy → prefer high mood_boost activities at mild intensity
+   - Good mood + good energy → suggest higher energy_cost activities, push for a strong session
+   - Recent streak of high energy_cost activities → suggest something restorative regardless of scores
+2. Always adjust the prescription (how to do the activity) based on mood and energy — same activity, different intensity and tone.
+3. Consider the weather. Don't suggest outdoor activities if conditions are poor.
+4. Yesterday's activities are the primary input. Use the last 7 days for recovery and pattern awareness only.
+5. If suggesting kung_fu, pick the most appropriate element from the library based on energy level and what hasn't been done recently.
+6. Don't repeat a recent suggestion unless it's clearly the best option.
+7. Be encouraging and specific. Mention the weather, their energy, or their recent pattern in your message.
+8. If diet data is available, factor it in. Low protein yesterday = mention it's a good day for a post-workout meal. Low calories = suggest something less intense. High sugar = note it and suggest balancing activity.
+9. If weight is logged, acknowledge it naturally if relevant — don't make it the focus but it adds useful context about the person's health journey.
+10. Factor in the user's goal when making suggestions — tailor the activity and messaging to support it.
 Respond in this exact JSON format with no markdown:
 {
   "suggested_activity": "one of the activity type_keys from the available activities list",
