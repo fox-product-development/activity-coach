@@ -822,50 +822,89 @@ export default function Home() {
 
       {/* REMOVE ACTIVITY CONFIRMATION */}
       {removeActivityOpen && activityToRemove && (
-        <Popup>
-          <h2 style={{ margin: "0 0 8px", color: colours.primaryDark }}>
-            Remove Activity
-          </h2>
-          <p
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 2000,
+            padding: 20,
+          }}
+        >
+          <div
             style={{
-              color: colours.textMuted,
-              fontSize: 14,
-              margin: "0 0 20px",
+              background: colours.white,
+              borderRadius: 16,
+              padding: 28,
+              maxWidth: 420,
+              width: "100%",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
             }}
           >
-            Remove{" "}
-            <strong>
-              {activityToRemove.emoji} {activityToRemove.name}
-            </strong>{" "}
-            from your list?
-          </p>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button
-              onClick={async () => {
-                await fetch("/api/activity-types", {
-                  method: "DELETE",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ type_key: activityToRemove.type_key }),
-                });
-                setRemoveActivityOpen(false);
-                setActivityToRemove(null);
-                fetchActivityTypes();
+            <h2 style={{ margin: "0 0 8px", color: colours.primaryDark }}>
+              Remove Activity
+            </h2>
+            <p
+              style={{
+                color: colours.textMuted,
+                fontSize: 14,
+                margin: "0 0 20px",
               }}
-              style={{ ...buttonStyle, background: "#DC2626", color: "white" }}
             >
-              Yes, remove
-            </button>
-            <button
-              onClick={() => {
-                setRemoveActivityOpen(false);
-                setActivityToRemove(null);
-              }}
-              style={skipStyle}
-            >
-              Cancel
-            </button>
+              Remove{" "}
+              <strong>
+                {activityToRemove.emoji} {activityToRemove.name}
+              </strong>{" "}
+              from your list?
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  try {
+                    const res = await fetch("/api/activity-types", {
+                      method: "DELETE",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        type_key: activityToRemove.type_key,
+                      }),
+                    });
+                    if (!res.ok) throw new Error("Delete failed");
+                    setRemoveActivityOpen(false);
+                    setActivityToRemove(null);
+                    fetchActivityTypes();
+                  } catch (err) {
+                    console.error("Failed to remove activity:", err);
+                    alert("Failed to remove activity. Please try again.");
+                  }
+                }}
+                style={{
+                  ...buttonStyle,
+                  background: "#DC2626",
+                  color: "white",
+                }}
+              >
+                Yes, remove
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRemoveActivityOpen(false);
+                  setActivityToRemove(null);
+                }}
+                style={skipStyle}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-        </Popup>
+        </div>
       )}
 
       {/* ACTIVITY TYPES MANAGEMENT POPUP */}
