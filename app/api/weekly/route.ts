@@ -25,11 +25,29 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.admin.listUsers();
 
     if (usersError) {
+      console.error("Error fetching users:", usersError);
       return NextResponse.json(
         { error: "Failed to fetch users" },
         { status: 500 },
       );
     }
+
+    const { data: allowedUsers, error: allowedError } = await supabase
+      .from("allowed_users")
+      .select("email");
+
+    if (allowedError) {
+      console.error("Error fetching allowed users:", allowedError);
+      return NextResponse.json(
+        { error: "Failed to fetch allowed users" },
+        { status: 500 },
+      );
+    }
+
+    const allowedEmails = new Set(allowedUsers.map((u) => u.email));
+    const filteredUsers = users.filter(
+      (u) => u.email && allowedEmails.has(u.email),
+    );
 
     const results = [];
 
