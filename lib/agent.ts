@@ -56,15 +56,28 @@ export async function runAgent(userId: string): Promise<{
     .lt("date", yesterdayStr)
     .order("date", { ascending: false });
 
-  // Yesterday's mood
+  // Last 7 days mood and energy
   const { data: moodLogs } = await supabase
     .from("mood_logs")
     .select("*")
     .eq("user_id", userId)
-    .eq("log_date", yesterdayStr)
-    .limit(1);
+    .gte("log_date", sevenDaysAgoStr)
+    .order("log_date", { ascending: false });
 
   const yesterdayMood = moodLogs?.[0] || null;
+  const avgMoodScore =
+    moodLogs && moodLogs.length > 0
+      ? Math.round(
+          moodLogs.reduce((sum, m) => sum + m.mood_score, 0) / moodLogs.length,
+        )
+      : null;
+  const avgEnergyScore =
+    moodLogs && moodLogs.length > 0
+      ? Math.round(
+          moodLogs.reduce((sum, m) => sum + m.energy_score, 0) /
+            moodLogs.length,
+        )
+      : null;
 
   // Recent suggestions
   const { data: recentSuggestions } = await supabase
@@ -215,11 +228,14 @@ Sugar: ${dietLog.sugar_g != null ? `${dietLog.sugar_g}g` : "not logged"}
     : "No diet data logged for yesterday."
 }
 
-## Yesterday's Mood & Energy
+## Mood & Energy (last 7 days)
 ${
-  yesterdayMood
-    ? `Mood: ${yesterdayMood.mood_score}/5, Energy: ${yesterdayMood.energy_score}/5${yesterdayMood.notes ? `, Notes: "${yesterdayMood.notes}"` : ""}`
-    : "No mood logged yesterday."
+  moodLogs && moodLogs.length > 0
+    ? `7-day average — Mood: ${avgMoodScore}/5, Energy: ${avgEnergyScore}/5
+Yesterday — Mood: ${yesterdayMood?.mood_score ?? "not logged"}/5, Energy: ${yesterdayMood?.energy_score ?? "not logged"}/5
+Full log:
+${moodLogs.map((m) => `- ${m.log_date}: mood ${m.mood_score}/5, energy ${m.energy_score}/5${m.notes ? ` — "${m.notes}"` : ""}`).join("\n")}`
+    : "No mood logged in the last 7 days."
 }
 
 ## Current Weather
