@@ -92,6 +92,16 @@ export async function runAgent(userId: string): Promise<{
 
   const userGoal = goalData?.[0]?.value || null;
 
+  // User's name
+  const { data: nameData } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("user_id", userId)
+    .eq("key", "name")
+    .limit(1);
+
+  const userName = nameData?.[0]?.value || null;
+
   // Yesterday's diet and weight
   const { data: dietLogs } = await supabase
     .from("diet_logs")
@@ -170,6 +180,8 @@ export async function runAgent(userId: string): Promise<{
   // STEP 2: Build the prompt
   // -------------------------------------------------------------------------
   const prompt = `You are a personal activity coach. Your job is to suggest ONE activity for today based on the context below.
+## User's Name
+${userName ? `The user's name is ${userName}. Address them by name naturally — not in every sentence, but enough to feel personal.` : "No name set — address them as 'you'."}
 
 ## User's Current Goal
 ${userGoal ? userGoal : "No goal set — give general balanced suggestions."}

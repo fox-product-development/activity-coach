@@ -60,6 +60,16 @@ export async function runWeeklyAgent(userId: string): Promise<{
 
   const kungFuEnabled = kungFuEnabledData?.[0]?.value === "true";
 
+  // User's name
+  const { data: nameData } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("user_id", userId)
+    .eq("key", "name")
+    .limit(1);
+
+  const userName = nameData?.[0]?.value || null;
+
   const { data: sashData } = await supabase
     .from("settings")
     .select("value")
@@ -177,6 +187,9 @@ export async function runWeeklyAgent(userId: string): Promise<{
   // BUILD PROMPT
   // -------------------------------------------------------------------------
   const prompt = `You are a personal activity coach writing a friendly weekly summary email.
+
+  ## User's Name
+${userName ? `The user's name is ${userName}. Address them by name naturally — not in every sentence, but enough to feel personal.` : "No name set — address them as 'you'."}
 
   ## User's Activities
 ${userActivities.map((a) => `- ${a.name}${a.is_outdoor ? " (outdoor)" : " (indoor)"}`).join("\n")}
