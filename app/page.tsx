@@ -76,9 +76,16 @@ function Section({
 // -------------------------------------------------------------------------
 // POPUP OVERLAY
 // -------------------------------------------------------------------------
-function Popup({ children }: { children: React.ReactNode }) {
+function Popup({
+  children,
+  onClose,
+}: {
+  children: React.ReactNode;
+  onClose?: () => void;
+}) {
   return (
     <div
+      onClick={onClose}
       style={{
         position: "fixed",
         top: 0,
@@ -94,6 +101,7 @@ function Popup({ children }: { children: React.ReactNode }) {
       }}
     >
       <div
+        onClick={(e) => e.stopPropagation()}
         style={{
           background: colours.white,
           borderRadius: 16,
@@ -631,7 +639,7 @@ export default function Home() {
     <>
       {/* SETTINGS POPUP */}
       {settingsOpen && (
-        <Popup>
+        <Popup onClose={() => setSettingsOpen(false)}>
           <h2 style={{ margin: "0 0 20px", color: colours.primaryDark }}>
             ⚙️ Settings
           </h2>
@@ -699,7 +707,7 @@ export default function Home() {
 
       {/* WEIGHT POPUP */}
       {checkComplete && popupStep === "weight" && (
-        <Popup>
+        <Popup onClose={() => setPopupStep("none")}>
           <h2 style={{ margin: "0 0 8px", color: colours.primaryDark }}>
             ⚖️ Morning Weigh-in
           </h2>
@@ -746,7 +754,7 @@ export default function Home() {
 
       {/* DIET POPUP */}
       {checkComplete && popupStep === "diet" && (
-        <Popup>
+        <Popup onClose={() => setPopupStep("none")}>
           <h2 style={{ margin: "0 0 8px", color: colours.primaryDark }}>
             🥗 Today's Diet
           </h2>
@@ -909,7 +917,7 @@ export default function Home() {
 
       {/* ACTIVITY TYPES MANAGEMENT POPUP */}
       {activityTypesOpen && (
-        <Popup>
+        <Popup onClose={() => setActivityTypesOpen(false)}>
           <h2 style={{ margin: "0 0 20px", color: colours.primaryDark }}>
             ⚙️ Manage Activities
           </h2>
@@ -1107,7 +1115,7 @@ export default function Home() {
 
       {/* ACTIVITY ADD/EDIT POPUP */}
       {(activityPopupMode === "add" || activityPopupMode === "edit") && (
-        <Popup>
+        <Popup onClose={() => setActivityPopupMode("none")}>
           <h2 style={{ margin: "0 0 4px", color: colours.primaryDark }}>
             {activityPopupMode === "edit"
               ? "✏️ Edit Activity"
@@ -1374,7 +1382,7 @@ export default function Home() {
 
       {/* CONFIRM AMENDMENT POPUP */}
       {activityPopupMode === "confirm" && editingActivity && (
-        <Popup>
+        <Popup onClose={() => setActivityPopupMode("none")}>
           <h2 style={{ margin: "0 0 8px", color: colours.primaryDark }}>
             ⚠️ Confirm Changes
           </h2>
@@ -1965,7 +1973,7 @@ export default function Home() {
           <>
             {/* LEVEL UP POPUP */}
             {levelUpOpen && (
-              <Popup>
+              <Popup onClose={() => setLevelUpOpen(false)}>
                 <h2 style={{ margin: "0 0 8px", color: colours.primaryDark }}>
                   🥋 Level Up!
                 </h2>
@@ -2019,7 +2027,7 @@ export default function Home() {
 
             {/* MARK AS DONE POPUP */}
             {markDoneOpen && (
-              <Popup>
+              <Popup onClose={() => setMarkDoneOpen(false)}>
                 <h2 style={{ margin: "0 0 4px", color: colours.primaryDark }}>
                   🥋 Log Kung Fu Session
                 </h2>
