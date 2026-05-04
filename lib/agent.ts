@@ -134,8 +134,8 @@ export async function runAgent(userId: string): Promise<{
     );
     return {
       ...a,
-      energy_cost: scores?.energy_cost ?? 3,
-      mood_boost: scores?.mood_boost ?? 3,
+      energy_cost: scores?.energy_cost ?? null,
+      mood_boost: scores?.mood_boost ?? null,
     };
   });
 
@@ -190,6 +190,7 @@ export async function runAgent(userId: string): Promise<{
   // STEP 2: Build the prompt
   // -------------------------------------------------------------------------
   const prompt = `You are a personal activity coach. Your job is to suggest ONE activity for today based on the context below.
+
 ## User's Name
 ${userName ? `The user's name is ${userName}. Address them by name naturally — not in every sentence, but enough to feel personal.` : "No name set — address them as 'you'."}
 
@@ -278,7 +279,7 @@ ${
     ? userActivities
         .map(
           (a) =>
-            `- ${a.type_key}: ${a.name}${a.is_outdoor ? " (outdoor — check weather)" : " (indoor)"} | energy_cost: ${a.energy_cost}/5, mood_boost: ${a.mood_boost}/5`,
+            `- ${a.type_key}: ${a.name}${a.is_outdoor ? " (outdoor — check weather)" : " (indoor)"} | energy_cost: ${a.energy_cost != null ? `${a.energy_cost}/5` : "not set"}, mood_boost: ${a.mood_boost != null ? `${a.mood_boost}/5` : "not set"}`,
         )
         .join("\n")
     : "No activities configured — suggest a gentle walk or rest day."
@@ -321,6 +322,8 @@ If no recent sessions exist, start with Fa Jing.
 8. If diet data is available, factor it in. Low protein yesterday = mention it's a good day for a post-workout meal. Low calories = suggest something less intense. High sugar = note it and suggest balancing activity.
 9. If weight is logged, acknowledge it naturally if relevant — don't make it the focus but it adds useful context about the person's health journey.
 10. Factor in the user's goal when making suggestions — tailor the activity and messaging to support it.
+11. If any activity has energy_cost or mood_boost marked as "not set", assign appropriate scores (1-5) based on your knowledge of that activity and include them in your response.
+
 Respond in this exact JSON format with no markdown:
 {
   "suggested_activity": "one of the activity type_keys from the available activities list",
@@ -334,7 +337,14 @@ Respond in this exact JSON format with no markdown:
     "yesterday_energy": number or null
   },
   "kung_fu_element": "the name of the rotating element, or null if kung fu is disabled",
-  "kung_fu_suggestion": "1-2 sentences for today's kung fu practice, or null if kung fu is disabled"
+  "kung_fu_suggestion": "1-2 sentences for today's kung fu practice, or null if kung fu is disabled",
+  "activity_score_updates": [
+    {
+      "type_key": "the activity type_key",
+      "energy_cost": number,
+      "mood_boost": number
+    }
+  ]
 }`;
 
   // -------------------------------------------------------------------------
@@ -354,6 +364,24 @@ Respond in this exact JSON format with no markdown:
   // -------------------------------------------------------------------------
   // STEP 4: Save to Supabase
   // -------------------------------------------------------------------------
+
+  // Update any activity scores returned by the agent
+  if (
+    parsed.activity_score_updates &&
+    parsed.activity_score_updates.length > 0
+  ) {
+    for (const update of parsed.activity_score_updates) {
+      await supabase
+        .from("user_activities")
+        .update({
+          energy_cost: update.energy_cost,
+          mood_boost: update.mood_boost,
+        })
+        .eq("user_id", userId)
+        .eq("activity_type", update.type_key);
+    }
+  }
+
   await supabase.from("agent_suggestions").upsert(
     {
       user_id: userId,

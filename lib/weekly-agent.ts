@@ -2,7 +2,8 @@
 //
 // Generates a weekly summary by pulling the last 7 days of data
 // and asking Claude to reflect on patterns, trends and set a focus
-// for the coming week.
+// for the coming week. Also reviews activity mood/energy scores
+// and updates them based on 28 days of logged data.
 
 import Anthropic from "@anthropic-ai/sdk";
 import { createServerSupabaseClient } from "@/lib/supabase";
@@ -30,13 +31,19 @@ export async function runWeeklyAgent(userId: string): Promise<{
   const sevenDaysAgoStr = sevenDaysAgo.toISOString().split("T")[0];
   const todayStr = new Date().toISOString().split("T")[0];
 
+  // 28 days ago for feedback loop
+  const twentyEightDaysAgo = new Date();
+  twentyEightDaysAgo.setDate(twentyEightDaysAgo.getDate() - 28);
+  const twentyEightDaysAgoStr = twentyEightDaysAgo.toISOString().split("T")[0];
+
   // -------------------------------------------------------------------------
   // GATHER DATA
   // -------------------------------------------------------------------------
-  // Fetch user's enabled activities
+
+  // Fetch user's enabled activities with mood and energy scores
   const { data: userActivitiesData } = await supabase
     .from("user_activities")
-    .select("activity_type")
+    .select("activity_type, energy_cost, mood_boost")
     .eq("user_id", userId)
     .eq("enabled", true);
 
@@ -48,7 +55,17 @@ export async function runWeeklyAgent(userId: string): Promise<{
     .select("*")
     .in("type_key", userActivityKeys.length > 0 ? userActivityKeys : ["none"]);
 
-  const userActivities = activityTypeDetails || [];
+  // Merge mood/energy scores into activity details
+  const userActivities = (activityTypeDetails || []).map((a) => {
+    const scores = userActivitiesData?.find(
+      (u) => u.activity_type === a.type_key,
+    );
+    return {
+      ...a,
+      energy_cost: scores?.energy_cost ?? null,
+      mood_boost: scores?.mood_boost ?? null,
+    };
+  });
 
   // Fetch Kung Fu settings
   const { data: kungFuEnabledData } = await supabase
@@ -70,6 +87,7 @@ export async function runWeeklyAgent(userId: string): Promise<{
 
   const userName = nameData?.[0]?.value || null;
 
+  // Kung Fu sash level
   const { data: sashData } = await supabase
     .from("settings")
     .select("value")
@@ -88,6 +106,7 @@ export async function runWeeklyAgent(userId: string): Promise<{
     .not("kung_fu_element", "is", null)
     .order("suggestion_date", { ascending: true });
 
+  // Last 7 days activities
   const { data: activities } = await supabase
     .from("activities")
     .select("*")
@@ -95,6 +114,22 @@ export async function runWeeklyAgent(userId: string): Promise<{
     .gte("date", sevenDaysAgoStr)
     .order("date", { ascending: true });
 
+  // Last 28 days activities and mood for feedback loop
+  const { data: activitiesLast28 } = await supabase
+    .from("activities")
+    .select("*")
+    .eq("user_id", userId)
+    .gte("date", twentyEightDaysAgoStr)
+    .order("date", { ascending: true });
+
+  const { data: moodLogsLast28 } = await supabase
+    .from("mood_logs")
+    .select("*")
+    .eq("user_id", userId)
+    .gte("log_date", twentyEightDaysAgoStr)
+    .order("log_date", { ascending: true });
+
+  // Last 7 days mood
   const { data: moodLogs } = await supabase
     .from("mood_logs")
     .select("*")
@@ -102,6 +137,7 @@ export async function runWeeklyAgent(userId: string): Promise<{
     .gte("log_date", sevenDaysAgoStr)
     .order("log_date", { ascending: true });
 
+  // Last 7 days diet
   const { data: dietLogs } = await supabase
     .from("diet_logs")
     .select("*")
@@ -109,6 +145,7 @@ export async function runWeeklyAgent(userId: string): Promise<{
     .gte("log_date", sevenDaysAgoStr)
     .order("log_date", { ascending: true });
 
+  // Last 7 days suggestions
   const { data: suggestions } = await supabase
     .from("agent_suggestions")
     .select("*")
@@ -186,13 +223,13 @@ export async function runWeeklyAgent(userId: string): Promise<{
   // -------------------------------------------------------------------------
   // BUILD PROMPT
   // -------------------------------------------------------------------------
-  const prompt = `You are a personal activity coach writing a friendly weekly summary email.
+  const prompt = `You are a personal activity coach writing a friendly weekly summary email. You are also responsible for reviewing and updating the user's personalised activity scores based on their logged data.
 
-  ## User's Name
+## User's Name
 ${userName ? `The user's name is ${userName}. Address them by name naturally — not in every sentence, but enough to feel personal.` : "No name set — address them as 'you'."}
 
-  ## User's Activities
-${userActivities.map((a) => `- ${a.name}${a.is_outdoor ? " (outdoor)" : " (indoor)"}`).join("\n")}
+## User's Activities with Current Scores
+${userActivities.map((a) => `- ${a.type_key}: ${a.name}${a.is_outdoor ? " (outdoor)" : " (indoor)"} | energy_cost: ${a.energy_cost != null ? `${a.energy_cost}/5` : "not set"}, mood_boost: ${a.mood_boost != null ? `${a.mood_boost}/5` : "not set"}`).join("\n")}
 
 ## Week Period
 ${sevenDaysAgoStr} to ${todayStr}
@@ -269,15 +306,43 @@ Note: Reference Kung Fu practice in the weekly summary if relevant — mention c
     : "Kung Fu is not enabled for this user — do not mention it."
 }
 
-## Your Task
-Write a warm, encouraging weekly summary email. Structure it as follows:
+## Last 28 Days — Activity & Mood Data (for score feedback loop only)
+Use this data to review whether the current energy_cost and mood_boost scores still reflect how this user actually responds to each activity. Look for patterns — does the user's mood or energy consistently change the day after a particular activity? If so, update the score accordingly. Only update if you have enough evidence (3 or more sessions of that activity).
 
-1. A brief opening (1 sentence only) — positive and energising
-2. Activity recap — what was achieved, highlights, rest days
-3. Weight & diet insight — trends, any notable days, protein/calorie observations
-4. Mood & energy reflection — note any correlations with diet or activity
-5. One clear focus for the coming week — specific and actionable
-6. A warm closing line (1 sentence only)
+Activities:
+${
+  activitiesLast28 && activitiesLast28.length > 0
+    ? activitiesLast28
+        .map(
+          (a) =>
+            `- ${a.date.split("T")[0]}: ${a.type} for ${a.duration_minutes} mins`,
+        )
+        .join("\n")
+    : "No activity data."
+}
+
+Mood & Energy logs:
+${
+  moodLogsLast28 && moodLogsLast28.length > 0
+    ? moodLogsLast28
+        .map(
+          (m) =>
+            `- ${m.log_date}: mood ${m.mood_score}/5, energy ${m.energy_score}/5`,
+        )
+        .join("\n")
+    : "No mood data."
+}
+
+## Your Task
+1. Write a warm, encouraging weekly summary email structured as follows:
+   - A brief opening (1 sentence only) — positive and energising
+   - Activity recap — what was achieved, highlights, rest days
+   - Weight & diet insight — trends, any notable days, protein/calorie observations
+   - Mood & energy reflection — note any correlations with diet or activity
+   - One clear focus for the coming week — specific and actionable
+   - A warm closing line (1 sentence only)
+
+2. Review the activity scores and return any updates warranted by the 28-day data. If any activity has scores marked as "not set", assign appropriate values based on your knowledge of that activity.
 
 FORMATTING RULES — follow these exactly:
 - Every section must start with a single bold headline sentence summarising that section, followed by the detail. Use **double asterisks** to mark bold sentences e.g. **This is the bold opener.**
@@ -297,7 +362,14 @@ Respond in this exact JSON format with no markdown:
     "weight_end": number or null,
     "weight_change": number or null
   },
-  "summary_text": "the full email body as a single string with paragraph breaks using \\n\\n. Bold sentences marked with **text**."
+  "summary_text": "the full email body as a single string with paragraph breaks using \\n\\n. Bold sentences marked with **text**.",
+  "activity_score_updates": [
+    {
+      "type_key": "the activity type_key",
+      "energy_cost": number,
+      "mood_boost": number
+    }
+  ]
 }`;
 
   // -------------------------------------------------------------------------
@@ -313,6 +385,27 @@ Respond in this exact JSON format with no markdown:
     message.content[0].type === "text" ? message.content[0].text : "";
   const clean = responseText.replace(/```json|```/g, "").trim();
   const parsed = JSON.parse(clean);
+
+  // -------------------------------------------------------------------------
+  // UPDATE ACTIVITY SCORES
+  // -------------------------------------------------------------------------
+
+  // Save any activity score updates returned by the agent
+  if (
+    parsed.activity_score_updates &&
+    parsed.activity_score_updates.length > 0
+  ) {
+    for (const update of parsed.activity_score_updates) {
+      await supabase
+        .from("user_activities")
+        .update({
+          energy_cost: update.energy_cost,
+          mood_boost: update.mood_boost,
+        })
+        .eq("user_id", userId)
+        .eq("activity_type", update.type_key);
+    }
+  }
 
   return {
     summary_text: parsed.summary_text,
