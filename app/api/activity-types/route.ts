@@ -3,6 +3,7 @@
 // GET — returns all activity types available to add (not already in user's list)
 // POST — adds an activity to user's list (and activity_types if new)
 // DELETE — removes from user's list, cleans up activity_types if no other users have it
+// PUT — updates is_suggestable flag for a user's activity
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient, getServerUser } from "@/lib/supabase";
@@ -37,16 +38,32 @@ export async function GET() {
     if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Also return user's current activities with full details
+    // Also return user's current activities with full details including is_suggestable
     const { data: currentTypes } = await supabase
       .from("activity_types")
       .select("*")
       .in("type_key", userActivityKeys.length > 0 ? userActivityKeys : ["none"])
       .order("name", { ascending: true });
 
+    // Fetch is_suggestable flags from user_activities
+    const { data: suggestableData } = await supabase
+      .from("user_activities")
+      .select("activity_type, is_suggestable")
+      .eq("user_id", user.id);
+
+    const currentWithFlags = (currentTypes || []).map((a) => {
+      const flags = suggestableData?.find(
+        (u) => u.activity_type === a.type_key,
+      );
+      return {
+        ...a,
+        is_suggestable: flags?.is_suggestable ?? true,
+      };
+    });
+
     return NextResponse.json({
       available: availableTypes || [],
-      current: currentTypes || [],
+      current: currentWithFlags,
     });
   } catch (err) {
     console.error("Activity types GET error:", err);
@@ -155,6 +172,42 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Activity types DELETE error:", err);
+    return NextResponse.json(
+      { error: "Something went wrong" },
+      { status: 500 },
+    );
+  }
+}
+export async function PUT(request: NextRequest) {
+  try {
+    const user = await getServerUser();
+    if (!user)
+      return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+
+    const body = await request.json();
+    const { type_key, is_suggestable } = body;
+
+    if (!type_key || is_suggestable === undefined) {
+      return NextResponse.json(
+        { error: "type_key and is_suggestable are required" },
+        { status: 400 },
+      );
+    }
+
+    const supabase = createServerSupabaseClient();
+
+    const { error } = await supabase
+      .from("user_activities")
+      .update({ is_suggestable })
+      .eq("user_id", user.id)
+      .eq("activity_type", type_key);
+
+    if (error)
+      return NextResponse.json({ error: error.message }, { status: 500 });
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Activity types PUT error:", err);
     return NextResponse.json(
       { error: "Something went wrong" },
       { status: 500 },

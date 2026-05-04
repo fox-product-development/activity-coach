@@ -125,10 +125,10 @@ export async function runAgent(userId: string): Promise<{
 
   const dietLog = dietLogs?.[0] || null;
 
-  // User's enabled activities with mood and energy scores
+  // User's enabled activities with mood, energy scores and suggestable flag
   const { data: userActivitiesData } = await supabase
     .from("user_activities")
-    .select("activity_type, energy_cost, mood_boost")
+    .select("activity_type, energy_cost, mood_boost, is_suggestable")
     .eq("user_id", userId)
     .eq("enabled", true);
 
@@ -140,7 +140,7 @@ export async function runAgent(userId: string): Promise<{
     .select("*")
     .in("type_key", userActivityKeys.length > 0 ? userActivityKeys : ["none"]);
 
-  // Merge mood/energy scores into activity details
+  // Merge mood/energy scores and suggestable flag into activity details
   const userActivities = (activityTypeDetails || []).map((a) => {
     const scores = userActivitiesData?.find(
       (u) => u.activity_type === a.type_key,
@@ -149,6 +149,7 @@ export async function runAgent(userId: string): Promise<{
       ...a,
       energy_cost: scores?.energy_cost ?? null,
       mood_boost: scores?.mood_boost ?? null,
+      is_suggestable: scores?.is_suggestable ?? true,
     };
   });
 
@@ -289,16 +290,27 @@ ${
     : "All activities available today."
 }
 
-## Available Activities
+## Available Activities (suggestable only — use these for today's suggestion)
 ${
-  userActivities.length > 0
+  userActivities.filter((a) => a.is_suggestable).length > 0
     ? userActivities
+        .filter((a) => a.is_suggestable)
         .map(
           (a) =>
             `- ${a.type_key}: ${a.name}${a.is_outdoor ? " (outdoor — check weather)" : " (indoor)"} | energy_cost: ${a.energy_cost != null ? `${a.energy_cost}/5` : "not set"}, mood_boost: ${a.mood_boost != null ? `${a.mood_boost}/5` : "not set"}`,
         )
         .join("\n")
-    : "No activities configured — suggest a gentle walk or rest day."
+    : "No suggestable activities configured — suggest a gentle walk or rest day."
+}
+
+## Non-suggestable Activities (logged for context only — do not suggest these)
+${
+  userActivities.filter((a) => !a.is_suggestable).length > 0
+    ? userActivities
+        .filter((a) => !a.is_suggestable)
+        .map((a) => `- ${a.type_key}: ${a.name}`)
+        .join("\n")
+    : "None."
 }
 
 ${

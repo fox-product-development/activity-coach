@@ -978,55 +978,120 @@ export default function Home() {
           </h2>
 
           {/* CURRENT ACTIVITIES */}
-          <p
+          <div
             style={{
-              fontWeight: 700,
-              color: colours.primaryDark,
-              margin: "0 0 8px",
-              fontSize: 14,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 8,
             }}
           >
-            Your Activities
-          </p>
+            <p
+              style={{
+                fontWeight: 700,
+                color: colours.primaryDark,
+                margin: 0,
+                fontSize: 14,
+              }}
+            >
+              Your Activities
+            </p>
+            <p
+              style={{
+                fontWeight: 700,
+                color: colours.primaryDark,
+                margin: 0,
+                fontSize: 14,
+              }}
+            >
+              Suggest?
+            </p>
+          </div>
           {userActivityTypes.map((activity) => (
             <div
               key={activity.type_key}
               style={{
                 display: "flex",
-                justifyContent: "space-between",
                 alignItems: "center",
-                background: colours.cardBg,
-                border: `1px solid ${colours.cardBorder}`,
-                borderRadius: 8,
-                padding: "10px 14px",
+                gap: 10,
                 marginBottom: 8,
               }}
             >
-              <span
+              {/* ACTIVITY CARD */}
+              <div
                 style={{
-                  color: colours.primaryDark,
-                  fontWeight: 600,
-                  fontSize: 14,
+                  flex: 1,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  background: colours.cardBg,
+                  border: `1px solid ${colours.cardBorder}`,
+                  borderRadius: 8,
+                  padding: "10px 14px",
                 }}
               >
-                {activity.emoji} {activity.name}
-              </span>
+                <span
+                  style={{
+                    color: colours.primaryDark,
+                    fontWeight: 600,
+                    fontSize: 14,
+                  }}
+                >
+                  {activity.emoji} {activity.name}
+                </span>
+                <button
+                  onClick={() => {
+                    setActivityToRemove(activity);
+                    setRemoveActivityOpen(true);
+                  }}
+                  style={{
+                    background: "none",
+                    border: `1px solid #DC2626`,
+                    borderRadius: 6,
+                    padding: "4px 10px",
+                    color: "#DC2626",
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+
+              {/* SUGGEST TOGGLE */}
               <button
-                onClick={() => {
-                  setActivityToRemove(activity);
-                  setRemoveActivityOpen(true);
+                onClick={async () => {
+                  const current = activity.is_suggestable ?? true;
+                  await fetch("/api/activity-types", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      type_key: activity.type_key,
+                      is_suggestable: !current,
+                    }),
+                  });
+                  fetchActivityTypes();
                 }}
                 style={{
-                  background: "none",
-                  border: `1px solid #DC2626`,
-                  borderRadius: 6,
-                  padding: "4px 10px",
-                  color: "#DC2626",
+                  background:
+                    (activity.is_suggestable ?? true)
+                      ? colours.primary
+                      : "#e5e5e5",
+                  border: "none",
+                  borderRadius: 20,
+                  padding: "6px 14px",
                   fontSize: 12,
+                  fontWeight: 700,
+                  color:
+                    (activity.is_suggestable ?? true)
+                      ? colours.primaryDark
+                      : colours.textMuted,
                   cursor: "pointer",
+                  minWidth: 52,
+                  whiteSpace: "nowrap",
                 }}
               >
-                Remove
+                {(activity.is_suggestable ?? true) ? "Yes" : "No"}
               </button>
             </div>
           ))}
