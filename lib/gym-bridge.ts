@@ -47,7 +47,10 @@ export async function fetchGymWeight(): Promise<GymWeightEntry[] | null> {
   try {
     const data = await gymFetch("/bridge/weight");
     if (!data || !Array.isArray(data)) return null;
-    return data as GymWeightEntry[];
+    return data.map((entry: any) => ({
+      date: entry.date.split("T")[0],
+      weight_kg: parseFloat(entry.weight_kg),
+    }));
   } catch {
     return null;
   }

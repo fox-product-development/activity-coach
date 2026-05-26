@@ -22,7 +22,16 @@ export async function GET() {
     if (!res.ok) return NextResponse.json({ weights: [] });
 
     const data = await res.json();
-    return NextResponse.json({ weights: data });
+
+    // Gym App returns a plain array — normalise dates and parse weight strings
+    const weights = Array.isArray(data)
+      ? data.map((entry: any) => ({
+          date: entry.date.split("T")[0],
+          weight_kg: parseFloat(entry.weight_kg),
+        }))
+      : [];
+
+    return NextResponse.json({ weights });
   } catch {
     return NextResponse.json({ weights: [] });
   }
