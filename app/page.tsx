@@ -1517,54 +1517,69 @@ export default function Home() {
         }}
       >
         <div style={{ marginBottom: 32 }}>
-          <div
+          <h1
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
+              margin: "0 0 12px",
+              fontSize: 28,
+              color: colours.primaryDark,
             }}
           >
-            <h1 style={{ margin: 0, fontSize: 28, color: colours.primaryDark }}>
-              ☀️ Activity Coach
-            </h1>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={() => setSettingsOpen(true)}
-                style={{
-                  background: "none",
-                  border: `1px solid ${colours.border}`,
-                  borderRadius: 8,
-                  padding: "6px 12px",
-                  fontSize: 10,
-                  color: colours.textMuted,
-                  cursor: "pointer",
-                }}
-              >
-                Settings
-              </button>
-              <button
-                onClick={async () => {
-                  const { createBrowserClient } = await import("@supabase/ssr");
-                  const supabase = createBrowserClient(
-                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-                  );
-                  await supabase.auth.signOut();
-                  window.location.href = "/login";
-                }}
-                style={{
-                  background: "none",
-                  border: `1px solid ${colours.border}`,
-                  borderRadius: 8,
-                  padding: "6px 12px",
-                  fontSize: 10,
-                  color: colours.textMuted,
-                  cursor: "pointer",
-                }}
-              >
-                Sign out
-              </button>
-            </div>
+            ☀️ Activity Coach
+          </h1>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() =>
+                window.open("https://gym.activitycoach.co.uk", "_blank")
+              }
+              style={{
+                background: colours.primary,
+                border: `1px solid ${colours.border}`,
+                borderRadius: 8,
+                padding: "6px 12px",
+                fontSize: 10,
+                color: colours.primaryDark,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              🏋️ Gym App
+            </button>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              style={{
+                background: "none",
+                border: `1px solid ${colours.border}`,
+                borderRadius: 8,
+                padding: "6px 12px",
+                fontSize: 10,
+                color: colours.textMuted,
+                cursor: "pointer",
+              }}
+            >
+              Settings
+            </button>
+            <button
+              onClick={async () => {
+                const { createBrowserClient } = await import("@supabase/ssr");
+                const supabase = createBrowserClient(
+                  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                );
+                await supabase.auth.signOut();
+                window.location.href = "/login";
+              }}
+              style={{
+                background: "none",
+                border: `1px solid ${colours.border}`,
+                borderRadius: 8,
+                padding: "6px 12px",
+                fontSize: 10,
+                color: colours.textMuted,
+                cursor: "pointer",
+              }}
+            >
+              Sign out
+            </button>
           </div>
           <p
             style={{
