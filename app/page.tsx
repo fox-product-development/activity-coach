@@ -1517,15 +1517,6 @@ export default function Home() {
         }}
       >
         <div style={{ marginBottom: 32 }}>
-          <h1
-            style={{
-              margin: "0 0 12px",
-              fontSize: 28,
-              color: colours.primaryDark,
-            }}
-          >
-            ☀️ Activity Coach
-          </h1>
           <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={() =>
@@ -1581,6 +1572,15 @@ export default function Home() {
               Sign out
             </button>
           </div>
+          <h1
+            style={{
+              margin: "0 0 12px",
+              fontSize: 28,
+              color: colours.primaryDark,
+            }}
+          >
+            ☀️ Activity Coach
+          </h1>
           <p
             style={{
               color: colours.textMuted,
