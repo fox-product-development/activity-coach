@@ -8,6 +8,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { getWeather } from "@/lib/weather";
+import { fetchGymContext, fetchGymWeight } from "@/lib/gym-bridge";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -153,6 +154,20 @@ export async function runWeeklyAgent(userId: string): Promise<{
     .gte("suggestion_date", sevenDaysAgoStr)
     .order("suggestion_date", { ascending: true });
 
+  // Gym App data
+  let gymContext = null;
+  let gymWeightHistory = null;
+  try {
+    gymContext = await fetchGymContext();
+  } catch (err) {
+    console.error("Gym context fetch failed, continuing without it:", err);
+  }
+  try {
+    gymWeightHistory = await fetchGymWeight();
+  } catch (err) {
+    console.error("Gym weight fetch failed, continuing without it:", err);
+  }
+
   // -------------------------------------------------------------------------
   // CALCULATE STATS
   // -------------------------------------------------------------------------
@@ -172,8 +187,12 @@ export async function runWeeklyAgent(userId: string): Promise<{
       {} as Record<string, number>,
     ) || {};
 
-  // Weight trend
-  const weightLogs = dietLogs?.filter((d) => d.weight_kg != null) || [];
+  // Weight trend — sourced from Gym App
+  const weightLogs = gymWeightHistory
+    ? gymWeightHistory.filter(
+        (w) => w.date >= sevenDaysAgoStr && w.date <= todayStr,
+      )
+    : [];
   const firstWeight = weightLogs[0]?.weight_kg || null;
   const lastWeight = weightLogs[weightLogs.length - 1]?.weight_kg || null;
   const weightChange =
@@ -286,6 +305,17 @@ ${
         )
         .join("\n")
     : "No suggestions logged."
+}
+
+## Gym Training Context This Week
+${
+  gymContext
+    ? `Training phase: ${gymContext.training_phase}
+Week: ${gymContext.week_number}
+Sessions this week: ${gymContext.sessions_completed} completed of ${gymContext.sessions_planned} planned
+${gymContext.overload_flags.length > 0 ? `Progressive overload flags: ${gymContext.overload_flags.join(", ")}` : "No overload flags this week."}
+${gymContext.recent_1rm_highlights.length > 0 ? `Recent 1RM highlights: ${gymContext.recent_1rm_highlights.join(", ")}` : "No recent 1RM highlights."}`
+    : "Gym training context unavailable — do not reference gym load or training phase."
 }
 
 ## Kung Fu This Week

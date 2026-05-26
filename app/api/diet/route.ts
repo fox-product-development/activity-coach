@@ -41,18 +41,17 @@ export async function GET() {
     const todayLog = todayData?.[0] || null;
     const yesterdayLog = yesterdayData?.[0] || null;
 
-    const hasWeight = todayLog?.weight_kg != null;
     const hasDiet = todayLog?.kcal != null;
 
     return NextResponse.json({
       todayLog,
       yesterdayLog,
       recentLogs: recentLogs || [],
-      hasWeight,
+      hasWeight: true,
       hasDiet,
       todayStr: today,
       yesterdayStr,
-      isComplete: hasWeight && hasDiet,
+      isComplete: hasDiet,
     });
   } catch (err) {
     console.error("Diet GET error:", err);

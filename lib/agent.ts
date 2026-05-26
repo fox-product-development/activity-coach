@@ -3,6 +3,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { getWeather } from "@/lib/weather";
+import { fetchGymContext } from "@/lib/gym-bridge";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -93,6 +94,14 @@ export async function runAgent(userId: string): Promise<{
     weather = await getWeather();
   } catch (err) {
     console.error("Weather fetch failed, continuing without it:", err);
+  }
+
+  // Gym App training context
+  let gymContext = null;
+  try {
+    gymContext = await fetchGymContext();
+  } catch (err) {
+    console.error("Gym context fetch failed, continuing without it:", err);
   }
 
   // User's goal
@@ -214,12 +223,10 @@ ${userGoal ? userGoal : "No goal set — give general balanced suggestions."}
 ## Today's Date
 ${today} (${new Date().toLocaleDateString("en-GB", { weekday: "long" })})
 
-## Yesterday's Diet & Weight
+## Yesterday's Diet
 ${
   dietLog
-    ? `
-Weight: ${dietLog.weight_kg != null ? `${dietLog.weight_kg}kg` : "not logged"}
-Calories: ${dietLog.kcal != null ? `${dietLog.kcal} kcal (${dietLog.kcal_pct}% of daily guide)` : "not logged"}
+    ? `Calories: ${dietLog.kcal != null ? `${dietLog.kcal} kcal (${dietLog.kcal_pct}% of daily guide)` : "not logged"}
 Protein: ${dietLog.protein_g != null ? `${dietLog.protein_g}g (${dietLog.protein_pct}% of guide)` : "not logged"}
 Carbs: ${dietLog.carbs_g != null ? `${dietLog.carbs_g}g` : "not logged"}
 Fat: ${dietLog.fat_g != null ? `${dietLog.fat_g}g` : "not logged"}
@@ -277,6 +284,17 @@ ${
         .map((s) => `- ${s.suggestion_date}: ${s.suggested_activity}`)
         .join("\n")
     : "No recent suggestions."
+}
+
+## Gym Training Context
+${
+  gymContext
+    ? `Training phase: ${gymContext.training_phase}
+Week: ${gymContext.week_number}
+Sessions this week: ${gymContext.sessions_completed} completed of ${gymContext.sessions_planned} planned
+${gymContext.overload_flags.length > 0 ? `Progressive overload flags: ${gymContext.overload_flags.join(", ")}` : "No overload flags this week."}
+${gymContext.recent_1rm_highlights.length > 0 ? `Recent 1RM highlights: ${gymContext.recent_1rm_highlights.join(", ")}` : "No recent 1RM highlights."}`
+    : "Gym training context unavailable — do not reference gym load or training phase."
 }
 
 ## Availability Constraints
@@ -348,7 +366,7 @@ If no recent sessions exist, start with Fa Jing.
 6. Don't repeat a recent suggestion unless it's clearly the best option.
 7. Be encouraging and specific. Mention the weather, their energy, or their recent pattern in your message.
 8. If diet data is available, factor it in. Low protein yesterday = mention it's a good day for a post-workout meal. Low calories = suggest something less intense. High sugar = note it and suggest balancing activity.
-9. If weight is logged, acknowledge it naturally if relevant — don't make it the focus but it adds useful context about the person's health journey.
+9. If gym training context is available, factor in training load and recovery. If sessions_completed >= sessions_planned this week, the user may need recovery — favour lower intensity. If overload flags are present, acknowledge the progress. If 1RM highlights exist, reference them to reinforce momentum. If gym context is unavailable, skip this entirely.
 10. Factor in the user's goal when making suggestions — tailor the activity and messaging to support it.
 11. If any activity has energy_cost or mood_boost marked as "not set", assign appropriate scores (1-5) based on your knowledge of that activity and include them in your response.
 
