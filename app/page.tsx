@@ -1931,6 +1931,16 @@ export default function Home() {
 
         {/* DIET SECTION */}
         <Section title="Diet" emoji="🥗">
+          {weightHistory.length > 0 && (
+            <p style={{ margin: "0 0 12px", fontSize: 14 }}>
+              ⚖️ <strong>Weight:</strong>{" "}
+              {weightHistory[weightHistory.length - 1].weight_kg}kg
+              <span style={{ color: colours.textMuted, fontSize: 12 }}>
+                {" "}
+                (from Gym App)
+              </span>
+            </p>
+          )}
           {dietLog ? (
             <div>
               <div
@@ -1951,16 +1961,6 @@ export default function Home() {
                 >
                   {formatDate(dietLog.log_date)}
                 </p>
-                {weightHistory.length > 0 && (
-                  <p style={{ margin: "0 0 8px", fontSize: 14 }}>
-                    ⚖️ <strong>Weight:</strong>{" "}
-                    {weightHistory[weightHistory.length - 1].weight_kg}kg
-                    <span style={{ color: colours.textMuted, fontSize: 12 }}>
-                      {" "}
-                      (from Gym App)
-                    </span>
-                  </p>
-                )}
                 {dietLog.kcal ? (
                   <div style={{ fontSize: 14 }}>
                     <p style={{ margin: "0 0 4px" }}>
