@@ -96,12 +96,14 @@ export async function runAgent(userId: string): Promise<{
     console.error("Weather fetch failed, continuing without it:", err);
   }
 
-  // Gym App training context
+  // Gym App training context — only for owner user
   let gymContext = null;
-  try {
-    gymContext = await fetchGymContext();
-  } catch (err) {
-    console.error("Gym context fetch failed, continuing without it:", err);
+  if (userId === process.env.OWNER_USER_ID) {
+    try {
+      gymContext = await fetchGymContext();
+    } catch (err) {
+      console.error("Gym context fetch failed, continuing without it:", err);
+    }
   }
 
   // User's goal

@@ -11,6 +11,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
 
     const supabase = createServerSupabaseClient();
+    const isOwner = user.id === process.env.OWNER_USER_ID;
 
     const today = new Date().toISOString().split("T")[0];
     const yesterday = new Date();
@@ -43,15 +44,20 @@ export async function GET() {
 
     const hasDiet = todayLog?.kcal != null;
 
+    // Owner: weight comes from Gym App so always skip weight popup
+    // Non-owner: check diet_logs for weight
+    const hasWeight = isOwner ? true : todayLog?.weight_kg != null;
+
     return NextResponse.json({
       todayLog,
       yesterdayLog,
       recentLogs: recentLogs || [],
-      hasWeight: true,
+      hasWeight,
       hasDiet,
+      isOwner,
       todayStr: today,
       yesterdayStr,
-      isComplete: hasDiet,
+      isComplete: isOwner ? hasDiet : hasWeight && hasDiet,
     });
   } catch (err) {
     console.error("Diet GET error:", err);
@@ -198,7 +204,6 @@ For numeric values, extract just the number without units.`,
     } else if (dateText.includes("yesterday")) {
       log_date = yesterdayStr;
     } else {
-      // Add current year to help parse short dates like "Fri 1 May"
       const dateWithYear = `${extracted.date_text} ${new Date().getFullYear()}`;
       const parsed = new Date(dateWithYear);
 
@@ -231,7 +236,6 @@ For numeric values, extract just the number without units.`,
         );
       }
 
-      // Format date directly without timezone conversion
       const year = parsed.getFullYear();
       const month = String(parsed.getMonth() + 1).padStart(2, "0");
       const day = String(parsed.getDate()).padStart(2, "0");

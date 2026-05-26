@@ -122,7 +122,7 @@ function Popup({
 // -------------------------------------------------------------------------
 // TYPES
 // -------------------------------------------------------------------------
-type PopupStep = "none" | "diet";
+type PopupStep = "none" | "weight" | "diet";
 type ActivityPopupMode = "none" | "add" | "edit" | "confirm";
 type ActivityTab = "manual" | "screenshot";
 
@@ -193,9 +193,13 @@ export default function Home() {
   const [dietLog, setDietLog] = useState<DietLog | null>(null);
   const [yesterdayStr, setYesterdayStr] = useState("");
   const [checkComplete, setCheckComplete] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const [weightHistory, setWeightHistory] = useState<
     { date: string; weight_kg: number }[]
   >([]);
+  const [weight, setWeight] = useState("");
+  const [weightSubmitting, setWeightSubmitting] = useState(false);
+  const [weightMessage, setWeightMessage] = useState("");
   const [dietImage, setDietImage] = useState<File | null>(null);
   const [dietSubmitting, setDietSubmitting] = useState(false);
   const [dietMessage, setDietMessage] = useState("");
@@ -260,6 +264,7 @@ export default function Home() {
     const res = await fetch("/api/weight");
     const data = await res.json();
     setWeightHistory(data.weights || []);
+    setIsOwner(data.isOwner || false);
   }
 
   async function fetchActivityTypes() {
@@ -379,7 +384,9 @@ export default function Home() {
     setDietLog(data.todayLog);
     setYesterdayStr(data.yesterdayStr);
 
-    if (!data.hasDiet) {
+    if (!data.hasWeight) {
+      setPopupStep("weight");
+    } else if (!data.hasDiet) {
       setPopupStep("diet");
     } else {
       setPopupStep("none");
@@ -512,6 +519,32 @@ export default function Home() {
       setGoalEditing(false);
     }
     setGoalSaving(false);
+  }
+
+  // -------------------------------------------------------------------------
+  // WEIGHT SUBMIT
+  // -------------------------------------------------------------------------
+  async function handleWeightSubmit() {
+    if (!weight) return;
+    setWeightSubmitting(true);
+    setWeightMessage("");
+
+    const res = await fetch("/api/diet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weight_kg: weight }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      setDietLog(data.log);
+      setPopupStep("diet");
+      setWeight("");
+    } else {
+      setWeightMessage(data.error || "Something went wrong");
+    }
+    setWeightSubmitting(false);
   }
 
   // -------------------------------------------------------------------------
@@ -734,6 +767,53 @@ export default function Home() {
             </button>
             <button onClick={() => setSettingsOpen(false)} style={skipStyle}>
               Cancel
+            </button>
+          </div>
+        </Popup>
+      )}
+
+      {/* WEIGHT POPUP — non-owner only */}
+      {checkComplete && !isOwner && popupStep === "weight" && (
+        <Popup onClose={() => setPopupStep("none")}>
+          <h2 style={{ margin: "0 0 8px", color: colours.primaryDark }}>
+            ⚖️ Morning Weigh-in
+          </h2>
+          <p
+            style={{
+              color: colours.textMuted,
+              fontSize: 14,
+              margin: "0 0 20px",
+            }}
+          >
+            Log your weight for today — best done first thing for consistency.
+          </p>
+          <input
+            type="number"
+            step="0.1"
+            min={20}
+            max={300}
+            placeholder="e.g. 82.5"
+            value={weight}
+            onChange={(e) => setWeight(e.target.value)}
+            style={{ ...inputStyle, marginBottom: 16, fontSize: 18 }}
+          />
+          {weightMessage && (
+            <p
+              style={{ color: colours.error, fontSize: 13, margin: "0 0 12px" }}
+            >
+              {weightMessage}
+            </p>
+          )}
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <button
+              onClick={handleWeightSubmit}
+              disabled={weightSubmitting || !weight}
+              style={{ ...buttonStyle, opacity: !weight ? 0.5 : 1 }}
+            >
+              {weightSubmitting ? "Saving..." : "Submit"}
+            </button>
+            <button onClick={() => setPopupStep("diet")} style={skipStyle}>
+              Skip for now
             </button>
           </div>
         </Popup>
@@ -1950,10 +2030,12 @@ export default function Home() {
             <p style={{ margin: "0 0 12px", fontSize: 14 }}>
               ⚖️ <strong>Weight:</strong>{" "}
               {weightHistory[weightHistory.length - 1].weight_kg}kg
-              <span style={{ color: colours.textMuted, fontSize: 12 }}>
-                {" "}
-                (from Gym App)
-              </span>
+              {isOwner && (
+                <span style={{ color: colours.textMuted, fontSize: 12 }}>
+                  {" "}
+                  (from Gym App)
+                </span>
+              )}
             </p>
           )}
           {dietLog ? (
@@ -2013,6 +2095,18 @@ export default function Home() {
                 )}
               </div>
               <div style={{ display: "flex", gap: 10 }}>
+                {!isOwner && (
+                  <button
+                    onClick={() => setPopupStep("weight")}
+                    style={{
+                      ...buttonStyle,
+                      fontSize: 13,
+                      padding: "8px 16px",
+                    }}
+                  >
+                    ⚖️ Update Weight
+                  </button>
+                )}
                 <button
                   onClick={() => setPopupStep("diet")}
                   style={{ ...buttonStyle, fontSize: 13, padding: "8px 16px" }}

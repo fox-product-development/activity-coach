@@ -154,18 +154,20 @@ export async function runWeeklyAgent(userId: string): Promise<{
     .gte("suggestion_date", sevenDaysAgoStr)
     .order("suggestion_date", { ascending: true });
 
-  // Gym App data
+  // Gym App data — only for owner user
   let gymContext = null;
   let gymWeightHistory = null;
-  try {
-    gymContext = await fetchGymContext();
-  } catch (err) {
-    console.error("Gym context fetch failed, continuing without it:", err);
-  }
-  try {
-    gymWeightHistory = await fetchGymWeight();
-  } catch (err) {
-    console.error("Gym weight fetch failed, continuing without it:", err);
+  if (userId === process.env.OWNER_USER_ID) {
+    try {
+      gymContext = await fetchGymContext();
+    } catch (err) {
+      console.error("Gym context fetch failed, continuing without it:", err);
+    }
+    try {
+      gymWeightHistory = await fetchGymWeight();
+    } catch (err) {
+      console.error("Gym weight fetch failed, continuing without it:", err);
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -187,12 +189,15 @@ export async function runWeeklyAgent(userId: string): Promise<{
       {} as Record<string, number>,
     ) || {};
 
-  // Weight trend — sourced from Gym App
+  // Weight trend — from Gym App for owner, from diet_logs for non-owner
   const weightLogs = gymWeightHistory
     ? gymWeightHistory.filter(
         (w) => w.date >= sevenDaysAgoStr && w.date <= todayStr,
       )
-    : [];
+    : (dietLogs?.filter((d) => d.weight_kg != null) || []).map((d) => ({
+        date: d.log_date,
+        weight_kg: d.weight_kg,
+      }));
   const firstWeight = weightLogs[0]?.weight_kg || null;
   const lastWeight = weightLogs[weightLogs.length - 1]?.weight_kg || null;
   const weightChange =
