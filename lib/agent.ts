@@ -291,11 +291,31 @@ ${
 ## Gym Training Context
 ${
   gymContext
-    ? `Training phase: ${gymContext.training_phase}
-Week: ${gymContext.week_number}
-Sessions this week: ${gymContext.sessions_completed} completed of ${gymContext.sessions_planned} planned
-${gymContext.overload_flags.length > 0 ? `Progressive overload flags: ${gymContext.overload_flags.join(", ")}` : "No overload flags this week."}
-${gymContext.recent_1rm_highlights.length > 0 ? `Recent 1RM highlights: ${gymContext.recent_1rm_highlights.join(", ")}` : "No recent 1RM highlights."}`
+    ? (() => {
+        const ctx = gymContext as any;
+        const sessionsThisWeek = ctx.sessions_this_week || [];
+        const completed = sessionsThisWeek.filter(
+          (s: any) => s.status === "complete",
+        );
+        const planned = sessionsThisWeek.filter(
+          (s: any) => s.status === "planned",
+        );
+        const overloadFlags = ctx.progressive_overload_achieved || [];
+        const highlights = ctx.recent_1rm_highlights || [];
+        return `Training phase: ${ctx.current_phase || "unknown"} (block ${ctx.current_block || "?"}, week ${ctx.phase_week || "?"})
+Sessions this week: ${completed.length} completed, ${planned.length} still planned
+${completed.length > 0 ? `Completed sessions: ${completed.map((s: any) => `${s.session_type} at ${s.gym}`).join(", ")}` : "No sessions completed yet this week."}
+${planned.length > 0 ? `Upcoming sessions: ${planned.map((s: any) => `${s.session_type} at ${s.gym}`).join(", ")}` : "No further sessions planned this week."}
+${overloadFlags.length > 0 ? `Progressive overload achieved: ${overloadFlags.map((o: any) => (typeof o === "string" ? o : o.exercise_name || JSON.stringify(o))).join(", ")}` : "No progressive overload flags this week."}
+${
+  highlights.length > 0
+    ? `Recent 1RM highlights: ${highlights
+        .slice(0, 3)
+        .map((h: any) => `${h.exercise_name} — est. ${h.estimated_1rm}kg`)
+        .join(", ")}`
+    : "No recent 1RM highlights."
+}`;
+      })()
     : "Gym training context unavailable — do not reference gym load or training phase."
 }
 
